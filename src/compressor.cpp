@@ -5,13 +5,20 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <sstream>
+
+void Compressor::setLogger(LogCallback logCallback) {
+    logger = logCallback;
+}
+
+void Compressor::setProgressCallback(ProgressCallback progCallback) {
+    progress = progCallback;
+}
 
 bool Compressor::readFileAndBuildFrequency(const std::string& filename) {
     std::ifstream input(filename, std::ios::binary);
     if (!input.is_open()) {
-#if ENABLE_LOGGING
-        std::cerr << "Error: Could not open file " << filename << "\n";
-#endif
+        if (logger) logger("Error: Could not open file " + filename + "\n");
         return false;
     }
 
@@ -36,9 +43,7 @@ bool Compressor::readFileAndBuildFrequency(const std::string& filename) {
     input.close();
 
     if (originalFileSize == 0) {
-#if ENABLE_LOGGING
-        std::cerr << "Error: Input file is empty.\n";
-#endif
+        if (logger) logger("Error: Input file is empty.\n");
         return false;
     }
 
@@ -58,25 +63,19 @@ bool Compressor::compressFile(const std::string& inputFilename,
                               const std::unordered_map<unsigned char, std::string>& codes,
                               HuffmanNode* root) {
     if (!root) {
-#if ENABLE_LOGGING
-        std::cerr << "Error: Cannot compress because Huffman tree root is null.\n";
-#endif
+        if (logger) logger("Error: Cannot compress because Huffman tree root is null.\n");
         return false;
     }
 
     std::ifstream input(inputFilename, std::ios::binary);
     if (!input.is_open()) {
-#if ENABLE_LOGGING
-        std::cerr << "Error: Cannot open input file: " << inputFilename << "\n";
-#endif
+        if (logger) logger("Error: Cannot open input file: " + inputFilename + "\n");
         return false;
     }
 
     std::ofstream output(outputFilename, std::ios::binary);
     if (!output.is_open()) {
-#if ENABLE_LOGGING
-        std::cerr << "Error: Cannot create output file: " << outputFilename << "\n";
-#endif
+        if (logger) logger("Error: Cannot create output file: " + outputFilename + "\n");
         input.close();
         return false;
     }
@@ -87,20 +86,21 @@ bool Compressor::compressFile(const std::string& inputFilename,
     writer.writeTree(root);
 
     // Write original file size (64-bit big-endian)
-#if ENABLE_LOGGING
-    std::cout << "Writing original file size: " << originalFileSize << " bytes\n";
-#endif
+    if (logger) {
+        std::stringstream ss;
+        ss << "Writing original file size: " << originalFileSize << " bytes\n";
+        logger(ss.str());
+    }
+
     for (int i = 7; i >= 0; --i) {
         unsigned char sizeByte = static_cast<unsigned char>((originalFileSize >> (i * 8)) & 0xFF);
         writer.writeByte(sizeByte);
-#if ENABLE_LOGGING
-        std::cout << "Size Byte[" << (7 - i) << "]: " << static_cast<int>(sizeByte) << "\n";
-#endif
     }
 
     // Encode input file using Huffman codes
     const size_t BUFFER_SIZE = 64 * 1024; // 64KB
     std::vector<char> buffer(BUFFER_SIZE);
+    uint64_t bytesProcessed = 0;
 
     while (input) {
         input.read(buffer.data(), BUFFER_SIZE);
@@ -111,9 +111,11 @@ bool Compressor::compressFile(const std::string& inputFilename,
             unsigned char byte = static_cast<unsigned char>(buffer[i]);
             auto it = codes.find(byte);
             if (it == codes.end()) {
-#if ENABLE_LOGGING
-                std::cerr << "Error: No Huffman code found for byte: " << static_cast<int>(byte) << "\n";
-#endif
+                if (logger) {
+                    std::stringstream ss;
+                    ss << "Error: No Huffman code found for byte: " << static_cast<int>(byte) << "\n";
+                    logger(ss.str());
+                }
                 input.close();
                 output.close();
                 return false;
@@ -121,9 +123,11 @@ bool Compressor::compressFile(const std::string& inputFilename,
 
             const std::string& code = it->second;
             writer.writeBits(code);
-#if ENABLE_LOGGING
-            std::cout << "Encoding '" << byte << "' → " << code << " (" << code.length() << " bits)\n";
-#endif
+        }
+        
+        bytesProcessed += bytesRead;
+        if (progress && originalFileSize > 0) {
+            progress(static_cast<float>(bytesProcessed) / originalFileSize * 100.0f);
         }
     }
 
@@ -132,8 +136,8 @@ bool Compressor::compressFile(const std::string& inputFilename,
     input.close();
     output.close();
 
-#if ENABLE_LOGGING
-    std::cout << "Compression complete. Output: " << outputFilename << "\n";
-#endif
+    if (logger) {
+        logger("Compression complete. Output: " + outputFilename + "\n");
+    }
     return true;
 }

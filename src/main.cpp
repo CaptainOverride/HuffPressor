@@ -7,6 +7,27 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <iomanip>
+
+// Simple console logger
+void consoleLogger(const std::string& msg) {
+    std::cout << msg;
+}
+
+// Simple console progress bar
+void consoleProgress(float percentage) {
+    int barWidth = 50;
+    std::cout << "[";
+    int pos = barWidth * percentage / 100.0;
+    for (int i = 0; i < barWidth; ++i) {
+        if (i < pos) std::cout << "=";
+        else if (i == pos) std::cout << ">";
+        else std::cout << " ";
+    }
+    std::cout << "] " << std::fixed << std::setprecision(1) << percentage << " %\r";
+    std::cout.flush();
+    if (percentage >= 100.0f) std::cout << std::endl;
+}
 
 int main(int argc, char* argv[]) {
     // Validate argument count; Expecting: program -mode input output
@@ -26,11 +47,12 @@ int main(int argc, char* argv[]) {
         Compressor compressor;
         HuffmanTree tree;
 
+        // Set up callbacks
+        compressor.setLogger(consoleLogger);
+        compressor.setProgressCallback(consoleProgress);
+
         // Step 1: Build frequency map from input file
         if (!compressor.readFileAndBuildFrequency(inputFile)) {
-#if ENABLE_LOGGING
-            std::cerr << "Failed to read or analyze input file.\n";
-#endif
             return 1;
         }
 
@@ -42,31 +64,21 @@ int main(int argc, char* argv[]) {
 
         // Step 4: Compress input using Huffman codes
         if (!compressor.compressFile(inputFile, outputFile, tree.getHuffmanCodes(), tree.getRoot())) {
-#if ENABLE_LOGGING
-            std::cerr << "Compression failed.\n";
-#endif
             return 1;
         }
-
-#if ENABLE_LOGGING
-        std::cout << "Compression successful.\n";
-#endif
 
     } else if (mode == "-d") {
         // ===== DECOMPRESSION MODE =====
         Decompressor decompressor;
 
+        // Set up callbacks
+        decompressor.setLogger(consoleLogger);
+        decompressor.setProgressCallback(consoleProgress);
+
         // Step 1: Decompress the file using Huffman decoding
         if (!decompressor.decompressFile(inputFile, outputFile)) {
-#if ENABLE_LOGGING
-            std::cerr << "Decompression failed.\n";
-#endif
             return 1;
         }
-
-#if ENABLE_LOGGING
-        std::cout << "Decompression successful.\n";
-#endif
 
     } else {
         // Invalid operation mode

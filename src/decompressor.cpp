@@ -5,13 +5,20 @@
 #include <fstream>
 #include <iostream>
 #include <cstdint>
+#include <sstream>
 
-// Destructor: Frees the dynamically allocated Huffman tree
+void Decompressor::setLogger(LogCallback logCallback) {
+    logger = logCallback;
+}
+
+void Decompressor::setProgressCallback(ProgressCallback progCallback) {
+    progress = progCallback;
+}
+
 Decompressor::~Decompressor() {
     freeTree(root);
 }
 
-// Recursively deletes nodes of the Huffman tree
 void Decompressor::freeTree(HuffmanNode* node) {
     if (!node) return;
     freeTree(node->left);
@@ -19,55 +26,39 @@ void Decompressor::freeTree(HuffmanNode* node) {
     delete node;
 }
 
-// Main decompression routine
 bool Decompressor::decompressFile(const std::string& inputFilename, const std::string& outputFilename) {
     std::ifstream input(inputFilename, std::ios::binary);
     if (!input.is_open()) {
-#if ENABLE_LOGGING
-        std::cerr << "Failed to open compressed input file: " << inputFilename << "\n";
-#endif
+        if (logger) logger("Failed to open compressed input file: " + inputFilename + "\n");
         return false;
     }
 
     std::ofstream output(outputFilename, std::ios::binary);
     if (!output.is_open()) {
-#if ENABLE_LOGGING
-        std::cerr << "Failed to open output file: " << outputFilename << "\n";
-#endif
-        input.close();
+        if (logger) logger("Failed to open output file: " + outputFilename + "\n");
         return false;
     }
 
     BitReader reader(input);
 
-    // Step 1: Reconstruct the Huffman tree
+    // Step 1: Deserialize Huffman Tree
     root = deserializeTree(reader);
     if (!root) {
-#if ENABLE_LOGGING
-        std::cerr << "Tree deserialization failed. Possibly corrupted input.\n";
-#endif
-        input.close();
-        output.close();
+        if (logger) logger("Tree deserialization failed. Possibly corrupted input.\n");
         return false;
     }
 
-#if ENABLE_LOGGING
-    std::cout << "Huffman Tree deserialized successfully.\n";
-#endif
+    if (logger) logger("Huffman Tree deserialized successfully.\n");
 
-    // Step 2: Align to byte boundary before reading file size
+    // Step 2: Align to byte boundary
     reader.alignToByte();
 
-    // Step 3: Read original file size from metadata
+    // Step 3: Read original file size
     uint64_t originalSize = 0;
     for (int i = 7; i >= 0; --i) {
         unsigned char sizeByte;
         if (!reader.readByte(sizeByte)) {
-#if ENABLE_LOGGING
-            std::cerr << "Failed to read file size metadata.\n";
-#endif
-            input.close();
-            output.close();
+            if (logger) logger("Failed to read file size metadata.\n");
             return false;
         }
         originalSize |= static_cast<uint64_t>(sizeByte) << (8 * i);
@@ -75,63 +66,54 @@ bool Decompressor::decompressFile(const std::string& inputFilename, const std::s
 
     originalFileSize = originalSize;
 
-#if ENABLE_LOGGING
-    std::cout << "Original file size to decode: " << originalFileSize << " bytes\n";
-#endif
+    if (logger) {
+        std::stringstream ss;
+        ss << "Original file size to decode: " << originalFileSize << " bytes\n";
+        logger(ss.str());
+    }
 
-    // Step 4: Decode using Huffman tree
+    // Step 4: Decode
     decode(reader, output, root, originalFileSize);
 
-#if ENABLE_LOGGING
-    std::cout << "Decompression complete. Output saved at: " << outputFilename << "\n";
-#endif
-
-    input.close();
-    output.close();
+    if (logger) logger("Decompression complete. Output saved at: " + outputFilename + "\n");
     return true;
 }
 
-// Recursively rebuilds Huffman tree from bitstream
 HuffmanNode* Decompressor::deserializeTree(BitReader& reader) {
     bool bit;
     if (!reader.readBit(bit)) {
-#if ENABLE_LOGGING
-        std::cerr << "Failed to read bit while deserializing tree.\n";
-#endif
+        if (logger) logger("Failed to read bit while deserializing tree.\n");
         return nullptr;
     }
 
     if (bit) {
-        // Leaf node
         unsigned char byte;
         if (!reader.readByte(byte)) {
-#if ENABLE_LOGGING
-            std::cerr << "Failed to read byte for leaf node.\n";
-#endif
+            if (logger) logger("Failed to read byte for leaf node.\n");
             return nullptr;
         }
         return new HuffmanNode(byte, 0);
     }
 
-    // Internal node
     HuffmanNode* left = deserializeTree(reader);
     HuffmanNode* right = deserializeTree(reader);
 
     if (!left || !right) {
-#if ENABLE_LOGGING
-        std::cerr << "Incomplete subtree during tree reconstruction.\n";
-#endif
+        if (logger) logger("Incomplete subtree during tree reconstruction.\n");
         return nullptr;
     }
 
     return new HuffmanNode(0, left, right);
 }
 
-// Decodes compressed bitstream using the reconstructed Huffman tree
 void Decompressor::decode(BitReader& reader, std::ostream& output, HuffmanNode* root, uint64_t originalSize) {
     HuffmanNode* current = root;
     bool bit;
     uint64_t bytesWritten = 0;
+
+    // For progress reporting
+    uint64_t lastReported = 0;
+    const uint64_t reportInterval = originalSize / 100; // Report every 1% roughly
 
     while (bytesWritten < originalSize && reader.readBit(bit)) {
         current = bit ? current->right : current->left;
@@ -140,18 +122,26 @@ void Decompressor::decode(BitReader& reader, std::ostream& output, HuffmanNode* 
             output.put(current->byte);
             ++bytesWritten;
             current = root;
+
+            if (progress && originalSize > 0) {
+                if (bytesWritten - lastReported >= reportInterval || bytesWritten == originalSize) {
+                    progress(static_cast<float>(bytesWritten) / originalSize * 100.0f);
+                    lastReported = bytesWritten;
+                }
+            }
         }
     }
 
     if (bytesWritten < originalSize) {
-#if ENABLE_LOGGING
-        std::cerr << "Warning: Expected " << originalSize
-                  << " bytes, but only decoded " << bytesWritten << " bytes.\n";
-#endif
+        if (logger) {
+            std::stringstream ss;
+            ss << "Warning: Expected " << originalSize
+               << " bytes, but only decoded " << bytesWritten << " bytes.\n";
+            logger(ss.str());
+        }
     }
 }
 
-// Returns file size read from compressed metadata
 uint64_t Decompressor::getOriginalFileSize() const {
     return originalFileSize;
 }

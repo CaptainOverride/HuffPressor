@@ -3,6 +3,7 @@
 
 #include "bitReader.h"
 #include "huffmanTree.h"
+#include "callbacks.h"
 #include <string>
 #include <fstream>
 #include <cstdint>
@@ -13,6 +14,9 @@ public:
 
     uint64_t getOriginalFileSize() const;
 
+    void setLogger(LogCallback logCallback);
+    void setProgressCallback(ProgressCallback progCallback);
+
     ~Decompressor();  // Destructor to free tree memory
 
 private:
@@ -22,6 +26,8 @@ private:
 
     HuffmanNode* root = nullptr;  // Store root for cleanup
     uint64_t originalFileSize = 0;
+    LogCallback logger;
+    ProgressCallback progress;
 };
 
 #endif // DECOMPRESSOR_H
