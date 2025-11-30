@@ -6,23 +6,37 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Set executable target
-add_executable(huffpressor
-    src/main.cpp
+# Create a static library for the core logic
+add_library(huffpressor_lib STATIC
     src/compressor.cpp
     src/decompressor.cpp
     src/utils.cpp
     src/huffmanTree.cpp
     src/bitWriter.cpp
-    src/bitReader.cpp     
+    src/bitReader.cpp
 )
 
-# Add include directory for header files
-target_include_directories(huffpressor
-    PRIVATE ${CMAKE_SOURCE_DIR}/include
+# Include directories for the library
+target_include_directories(huffpressor_lib
+    PUBLIC ${CMAKE_SOURCE_DIR}/include
 )
 
-# Enable useful compiler warnings and optimization
-target_compile_options(huffpressor
+# Compiler options for the library
+target_compile_options(huffpressor_lib
+    PRIVATE -Wall -Wextra -pedantic -O2
+)
+
+# Set executable target (CLI tool)
+add_executable(huffpressor_cli
+    src/main.cpp
+)
+
+# Link the CLI tool against the core library
+target_link_libraries(huffpressor_cli
+    PRIVATE huffpressor_lib
+)
+
+# Compiler options for the CLI
+target_compile_options(huffpressor_cli
     PRIVATE -Wall -Wextra -pedantic -O2
 )
