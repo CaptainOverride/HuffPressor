@@ -5,20 +5,21 @@
 #include <string>
 #include <cstdint>
 #include "callbacks.h"
+#include "errors.h"
 
 // Forward declaration
 class HuffmanNode;
 
 class Compressor {
 public:
-    bool readFileAndBuildFrequency(const std::string& filename);
+    ErrorCode readFileAndBuildFrequency(const std::string& filename);
     const std::unordered_map<unsigned char, int>& getFrequencyMap() const;
     uint64_t getOriginalFileSize() const;
 
-    bool compressFile(const std::string& inputFilename,
-                      const std::string& outputFilename,
-                      const std::unordered_map<unsigned char, std::string>& codes,
-                      HuffmanNode* root);
+    ErrorCode compressFile(const std::string& inputFilename,
+                           const std::string& outputFilename,
+                           const std::unordered_map<unsigned char, std::string>& codes,
+                           HuffmanNode* root);
 
     void setLogger(LogCallback logCallback);
     void setProgressCallback(ProgressCallback progCallback);

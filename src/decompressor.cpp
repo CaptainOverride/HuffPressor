@@ -26,17 +26,17 @@ void Decompressor::freeTree(HuffmanNode* node) {
     delete node;
 }
 
-bool Decompressor::decompressFile(const std::string& inputFilename, const std::string& outputFilename) {
+ErrorCode Decompressor::decompressFile(const std::string& inputFilename, const std::string& outputFilename) {
     std::ifstream input(inputFilename, std::ios::binary);
     if (!input.is_open()) {
         if (logger) logger("Failed to open compressed input file: " + inputFilename + "\n");
-        return false;
+        return ErrorCode::FileNotFound;
     }
 
     std::ofstream output(outputFilename, std::ios::binary);
     if (!output.is_open()) {
         if (logger) logger("Failed to open output file: " + outputFilename + "\n");
-        return false;
+        return ErrorCode::FileCreateError;
     }
 
     BitReader reader(input);
@@ -45,7 +45,7 @@ bool Decompressor::decompressFile(const std::string& inputFilename, const std::s
     root = deserializeTree(reader);
     if (!root) {
         if (logger) logger("Tree deserialization failed. Possibly corrupted input.\n");
-        return false;
+        return ErrorCode::TreeDeserializationError;
     }
 
     if (logger) logger("Huffman Tree deserialized successfully.\n");
@@ -59,7 +59,7 @@ bool Decompressor::decompressFile(const std::string& inputFilename, const std::s
         unsigned char sizeByte;
         if (!reader.readByte(sizeByte)) {
             if (logger) logger("Failed to read file size metadata.\n");
-            return false;
+            return ErrorCode::FileReadError;
         }
         originalSize |= static_cast<uint64_t>(sizeByte) << (8 * i);
     }
@@ -76,7 +76,7 @@ bool Decompressor::decompressFile(const std::string& inputFilename, const std::s
     decode(reader, output, root, originalFileSize);
 
     if (logger) logger("Decompression complete. Output saved at: " + outputFilename + "\n");
-    return true;
+    return ErrorCode::Success;
 }
 
 HuffmanNode* Decompressor::deserializeTree(BitReader& reader) {

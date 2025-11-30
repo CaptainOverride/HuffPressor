@@ -3,6 +3,7 @@
 #include "huffmanTree.h"
 #include "utils.h"
 #include "config.h"
+#include "errors.h"
 
 #include <iostream>
 #include <fstream>
@@ -52,7 +53,9 @@ int main(int argc, char* argv[]) {
         compressor.setProgressCallback(consoleProgress);
 
         // Step 1: Build frequency map from input file
-        if (!compressor.readFileAndBuildFrequency(inputFile)) {
+        ErrorCode result = compressor.readFileAndBuildFrequency(inputFile);
+        if (result != ErrorCode::Success) {
+            std::cerr << "Error: " << getErrorMessage(result) << "\n";
             return 1;
         }
 
@@ -63,7 +66,9 @@ int main(int argc, char* argv[]) {
         tree.generateCodes();
 
         // Step 4: Compress input using Huffman codes
-        if (!compressor.compressFile(inputFile, outputFile, tree.getHuffmanCodes(), tree.getRoot())) {
+        result = compressor.compressFile(inputFile, outputFile, tree.getHuffmanCodes(), tree.getRoot());
+        if (result != ErrorCode::Success) {
+            std::cerr << "Error: " << getErrorMessage(result) << "\n";
             return 1;
         }
 
@@ -76,7 +81,9 @@ int main(int argc, char* argv[]) {
         decompressor.setProgressCallback(consoleProgress);
 
         // Step 1: Decompress the file using Huffman decoding
-        if (!decompressor.decompressFile(inputFile, outputFile)) {
+        ErrorCode result = decompressor.decompressFile(inputFile, outputFile);
+        if (result != ErrorCode::Success) {
+            std::cerr << "Error: " << getErrorMessage(result) << "\n";
             return 1;
         }
 

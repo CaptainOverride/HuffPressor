@@ -4,13 +4,14 @@
 #include "bitReader.h"
 #include "huffmanTree.h"
 #include "callbacks.h"
+#include "errors.h"
 #include <string>
 #include <fstream>
 #include <cstdint>
 
 class Decompressor {
 public:
-    bool decompressFile(const std::string& inputFilename, const std::string& outputFilename);
+    ErrorCode decompressFile(const std::string& inputFilename, const std::string& outputFilename);
 
     uint64_t getOriginalFileSize() const;
 

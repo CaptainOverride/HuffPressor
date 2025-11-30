@@ -15,11 +15,11 @@ void Compressor::setProgressCallback(ProgressCallback progCallback) {
     progress = progCallback;
 }
 
-bool Compressor::readFileAndBuildFrequency(const std::string& filename) {
+ErrorCode Compressor::readFileAndBuildFrequency(const std::string& filename) {
     std::ifstream input(filename, std::ios::binary);
     if (!input.is_open()) {
         if (logger) logger("Error: Could not open file " + filename + "\n");
-        return false;
+        return ErrorCode::FileNotFound;
     }
 
     freqMap.clear();
@@ -44,10 +44,10 @@ bool Compressor::readFileAndBuildFrequency(const std::string& filename) {
 
     if (originalFileSize == 0) {
         if (logger) logger("Error: Input file is empty.\n");
-        return false;
+        return ErrorCode::FileEmpty;
     }
 
-    return true;
+    return ErrorCode::Success;
 }
 
 const std::unordered_map<unsigned char, int>& Compressor::getFrequencyMap() const {
@@ -58,26 +58,26 @@ uint64_t Compressor::getOriginalFileSize() const {
     return originalFileSize;
 }
 
-bool Compressor::compressFile(const std::string& inputFilename,
-                              const std::string& outputFilename,
-                              const std::unordered_map<unsigned char, std::string>& codes,
-                              HuffmanNode* root) {
+ErrorCode Compressor::compressFile(const std::string& inputFilename,
+                                   const std::string& outputFilename,
+                                   const std::unordered_map<unsigned char, std::string>& codes,
+                                   HuffmanNode* root) {
     if (!root) {
         if (logger) logger("Error: Cannot compress because Huffman tree root is null.\n");
-        return false;
+        return ErrorCode::UnknownError;
     }
 
     std::ifstream input(inputFilename, std::ios::binary);
     if (!input.is_open()) {
         if (logger) logger("Error: Cannot open input file: " + inputFilename + "\n");
-        return false;
+        return ErrorCode::FileNotFound;
     }
 
     std::ofstream output(outputFilename, std::ios::binary);
     if (!output.is_open()) {
         if (logger) logger("Error: Cannot create output file: " + outputFilename + "\n");
         input.close();
-        return false;
+        return ErrorCode::FileCreateError;
     }
 
     BitWriter writer(output);
@@ -118,7 +118,7 @@ bool Compressor::compressFile(const std::string& inputFilename,
                 }
                 input.close();
                 output.close();
-                return false;
+                return ErrorCode::CompressionFailed;
             }
 
             const std::string& code = it->second;
@@ -139,5 +139,5 @@ bool Compressor::compressFile(const std::string& inputFilename,
     if (logger) {
         logger("Compression complete. Output: " + outputFilename + "\n");
     }
-    return true;
+    return ErrorCode::Success;
 }
