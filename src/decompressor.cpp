@@ -27,6 +27,13 @@ void Decompressor::freeTree(HuffmanNode* node) {
 }
 
 ErrorCode Decompressor::decompressFile(const std::string& inputFilename, const std::string& outputFilename) {
+    // Reset state from previous runs
+    if (root) {
+        freeTree(root);
+        root = nullptr;
+    }
+    originalFileSize = 0;
+
     std::ifstream input(inputFilename, std::ios::binary);
     if (!input.is_open()) {
         if (logger) logger("Failed to open compressed input file: " + inputFilename + "\n");
