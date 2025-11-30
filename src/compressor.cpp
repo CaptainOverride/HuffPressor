@@ -5,7 +5,6 @@
 #include <fstream>
 #include <iostream>
 
-
 bool Compressor::readFileAndBuildFrequency(const std::string& filename) {
     std::ifstream input(filename, std::ios::binary);
     if (!input.is_open()) {
@@ -25,6 +24,14 @@ bool Compressor::readFileAndBuildFrequency(const std::string& filename) {
     }
 
     input.close();
+
+    if (originalFileSize == 0) {
+#if ENABLE_LOGGING
+        std::cerr << "Error: Input file is empty.\n";
+#endif
+        return false;
+    }
+
     return true;
 }
 
@@ -40,6 +47,13 @@ bool Compressor::compressFile(const std::string& inputFilename,
                               const std::string& outputFilename,
                               const std::unordered_map<unsigned char, std::string>& codes,
                               HuffmanNode* root) {
+    if (!root) {
+#if ENABLE_LOGGING
+        std::cerr << "Error: Cannot compress because Huffman tree root is null.\n";
+#endif
+        return false;
+    }
+
     std::ifstream input(inputFilename, std::ios::binary);
     if (!input.is_open()) {
 #if ENABLE_LOGGING
@@ -77,7 +91,17 @@ bool Compressor::compressFile(const std::string& inputFilename,
     // Encode input file using Huffman codes
     unsigned char byte;
     while (input.read(reinterpret_cast<char*>(&byte), 1)) {
-        const std::string& code = codes.at(byte);
+        auto it = codes.find(byte);
+        if (it == codes.end()) {
+#if ENABLE_LOGGING
+            std::cerr << "Error: No Huffman code found for byte: " << static_cast<int>(byte) << "\n";
+#endif
+            input.close();
+            output.close();
+            return false;
+        }
+
+        const std::string& code = it->second;
         writer.writeBits(code);
 #if ENABLE_LOGGING
         std::cout << "Encoding '" << byte << "' → " << code << " (" << code.length() << " bits)\n";
@@ -94,3 +118,4 @@ bool Compressor::compressFile(const std::string& inputFilename,
 #endif
     return true;
 }
+ 
