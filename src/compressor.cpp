@@ -4,6 +4,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <vector>
 
 bool Compressor::readFileAndBuildFrequency(const std::string& filename) {
     std::ifstream input(filename, std::ios::binary);
@@ -17,10 +18,19 @@ bool Compressor::readFileAndBuildFrequency(const std::string& filename) {
     freqMap.clear();
     originalFileSize = 0;
 
-    unsigned char byte;
-    while (input.read(reinterpret_cast<char*>(&byte), 1)) {
-        freqMap[byte]++;
-        originalFileSize++;
+    const size_t BUFFER_SIZE = 64 * 1024; // 64KB
+    std::vector<char> buffer(BUFFER_SIZE);
+
+    while (input) {
+        input.read(buffer.data(), BUFFER_SIZE);
+        std::streamsize bytesRead = input.gcount();
+        if (bytesRead == 0) break;
+
+        for (std::streamsize i = 0; i < bytesRead; ++i) {
+            unsigned char byte = static_cast<unsigned char>(buffer[i]);
+            freqMap[byte]++;
+            originalFileSize++;
+        }
     }
 
     input.close();
@@ -89,23 +99,32 @@ bool Compressor::compressFile(const std::string& inputFilename,
     }
 
     // Encode input file using Huffman codes
-    unsigned char byte;
-    while (input.read(reinterpret_cast<char*>(&byte), 1)) {
-        auto it = codes.find(byte);
-        if (it == codes.end()) {
-#if ENABLE_LOGGING
-            std::cerr << "Error: No Huffman code found for byte: " << static_cast<int>(byte) << "\n";
-#endif
-            input.close();
-            output.close();
-            return false;
-        }
+    const size_t BUFFER_SIZE = 64 * 1024; // 64KB
+    std::vector<char> buffer(BUFFER_SIZE);
 
-        const std::string& code = it->second;
-        writer.writeBits(code);
+    while (input) {
+        input.read(buffer.data(), BUFFER_SIZE);
+        std::streamsize bytesRead = input.gcount();
+        if (bytesRead == 0) break;
+
+        for (std::streamsize i = 0; i < bytesRead; ++i) {
+            unsigned char byte = static_cast<unsigned char>(buffer[i]);
+            auto it = codes.find(byte);
+            if (it == codes.end()) {
 #if ENABLE_LOGGING
-        std::cout << "Encoding '" << byte << "' → " << code << " (" << code.length() << " bits)\n";
+                std::cerr << "Error: No Huffman code found for byte: " << static_cast<int>(byte) << "\n";
 #endif
+                input.close();
+                output.close();
+                return false;
+            }
+
+            const std::string& code = it->second;
+            writer.writeBits(code);
+#if ENABLE_LOGGING
+            std::cout << "Encoding '" << byte << "' → " << code << " (" << code.length() << " bits)\n";
+#endif
+        }
     }
 
     writer.flush();
@@ -118,4 +137,3 @@ bool Compressor::compressFile(const std::string& inputFilename,
 #endif
     return true;
 }
- 
