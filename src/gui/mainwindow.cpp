@@ -1,4 +1,4 @@
-#include "mainwindow.h"
+#include "mainWindow.h"
 #include "errors.h"
 #include "huffmanTree.h"
 #include <QThread>

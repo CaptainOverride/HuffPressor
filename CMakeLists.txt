@@ -16,6 +16,7 @@ add_library(HuffPressorCore STATIC
     src/core/huffmanTree.cpp
     src/core/bitWriter.cpp
     src/core/bitReader.cpp
+    src/core/archiver.cpp
 )
 
 target_include_directories(HuffPressorCore
@@ -48,8 +49,8 @@ find_package(Qt6 COMPONENTS Widgets REQUIRED)
 
 add_executable(HuffPressor
     src/gui/main.cpp
-    src/gui/mainwindow.cpp
-    src/gui/mainwindow.h
+    src/gui/mainWindow.cpp
+    src/gui/mainWindow.h
     src/gui/worker.cpp
     src/gui/worker.h
 )
