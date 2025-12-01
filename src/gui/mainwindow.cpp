@@ -7,28 +7,17 @@
 #include <QScrollBar>
 #include <QMimeData>
 #include <QUrl>
+#include <QStandardPaths>
+#include <filesystem>
+#include <cmath>
 
-
-
-
-#include "mainwindow.h"
-#include "errors.h"
-#include "huffmanTree.h"
-#include <QThread>
-#include <QApplication>
-#include <QFileInfo>
-#include <QScrollBar>
-#include <QMimeData>
-#include <QUrl>
-#include <QStandardPaths> // Added for temp file paths
+namespace fs = std::filesystem;
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     setupUI();
 }
-
-
 
 void MainWindow::setupUI() {
     // Apply Dark Theme
@@ -49,6 +38,7 @@ void MainWindow::setupUI() {
         "#dropZone:hover { border-color: #007acc; color: #ffffff; background-color: #2d2d30; }"
         "#saveButton { background-color: #2ea043; }" // Green for save
         "#saveButton:hover { background-color: #238636; }"
+        "#actionButton { background-color: #007acc; font-size: 16px; padding: 15px; }"
         "QProgressBar { "
         "   border: 1px solid #3d3d3d; border-radius: 5px; text-align: center; color: white;"
         "   background-color: #2d2d2d;"
@@ -79,26 +69,30 @@ void MainWindow::setupUI() {
     // Drop Zone
     dropZone = new QPushButton(this);
     dropZone->setObjectName("dropZone");
-    dropZone->setText("Drag & Drop File Here\nor Click to Browse");
+    dropZone->setText("Drag & Drop File/Folder Here\nor Click to Browse");
     dropZone->setCursor(Qt::PointingHandCursor);
     dropZone->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     layout->addWidget(dropZone);
 
-    // Action Buttons
-    QHBoxLayout *actionLayout = new QHBoxLayout();
-    compressButton = new QPushButton("Compress File", this);
-    decompressButton = new QPushButton("Decompress File", this);
-    compressButton->setCursor(Qt::PointingHandCursor);
-    decompressButton->setCursor(Qt::PointingHandCursor);
-    actionLayout->addWidget(compressButton);
-    actionLayout->addWidget(decompressButton);
-    layout->addLayout(actionLayout);
+    // File Info Label (Hidden initially)
+    fileInfoLabel = new QLabel("", this);
+    fileInfoLabel->setAlignment(Qt::AlignCenter);
+    fileInfoLabel->setStyleSheet("font-size: 16px; color: #cccccc; margin: 10px;");
+    fileInfoLabel->setVisible(false);
+    layout->addWidget(fileInfoLabel);
+
+    // Smart Action Button (Hidden initially)
+    actionButton = new QPushButton("Action", this);
+    actionButton->setObjectName("actionButton");
+    actionButton->setCursor(Qt::PointingHandCursor);
+    actionButton->setVisible(false);
+    layout->addWidget(actionButton);
 
     // Progress
     progressBar = new QProgressBar(this);
     progressBar->setValue(0);
-    progressBar->setTextVisible(false); // Clean look
-    progressBar->setFixedHeight(5);     // Slim look
+    progressBar->setTextVisible(false);
+    progressBar->setFixedHeight(5);
     layout->addWidget(progressBar);
 
     // Save Button (Hidden initially)
@@ -121,9 +115,8 @@ void MainWindow::setupUI() {
 
     // Connections
     connect(dropZone, &QPushButton::clicked, this, &MainWindow::selectFile);
-    connect(compressButton, &QPushButton::clicked, this, &MainWindow::startCompression);
-    connect(decompressButton, &QPushButton::clicked, this, &MainWindow::startDecompression);
     connect(saveButton, &QPushButton::clicked, this, &MainWindow::saveFile);
+    // actionButton connection is dynamic or handled in a slot
 
     setMinimumSize(700, 600);
 
@@ -148,6 +141,71 @@ void MainWindow::setupUI() {
     setAcceptDrops(true);
 }
 
+uint64_t MainWindow::getPathSize(const QString& path) {
+    std::string p = path.toStdString();
+    if (!fs::exists(p)) return 0;
+    
+    if (fs::is_regular_file(p)) {
+        return fs::file_size(p);
+    }
+    
+    if (fs::is_directory(p)) {
+        uint64_t size = 0;
+        for (const auto& entry : fs::recursive_directory_iterator(p)) {
+            if (entry.is_regular_file()) {
+                size += entry.file_size();
+            }
+        }
+        return size;
+    }
+    return 0;
+}
+
+QString MainWindow::formatSize(uint64_t bytes) {
+    const char* units[] = {"B", "KB", "MB", "GB", "TB"};
+    int i = 0;
+    double size = static_cast<double>(bytes);
+    while (size >= 1024 && i < 4) {
+        size /= 1024;
+        i++;
+    }
+    return QString::number(size, 'f', 2) + " " + units[i];
+}
+
+void MainWindow::updateSmartUI() {
+    if (selectedFilePath.isEmpty()) return;
+
+    QFileInfo fi(selectedFilePath);
+    originalSize = getPathSize(selectedFilePath);
+    
+    // Update Drop Zone Text
+    dropZone->setText("Selected:\n" + fi.fileName());
+
+    // Update Info Label
+    fileInfoLabel->setText("Original Size: " + formatSize(originalSize));
+    fileInfoLabel->setVisible(true);
+
+    // Determine Action
+    actionButton->disconnect(); // Remove old connections
+    
+    if (fi.suffix() == "huff") {
+        // It's a compressed file -> Decompress
+        actionButton->setText("Decompress File");
+        connect(actionButton, &QPushButton::clicked, this, &MainWindow::startDecompression);
+        isCompressionMode = false; // Will be set to false
+    } else {
+        // It's a file or folder -> Compress
+        actionButton->setText("Compress " + (fi.isDir() ? QString("Folder") : QString("File")));
+        connect(actionButton, &QPushButton::clicked, this, &MainWindow::startCompression);
+        isCompressionMode = true; // Will be set to true
+    }
+    
+    actionButton->setVisible(true);
+    saveButton->setVisible(false);
+    progressBar->setValue(0);
+    statusLabel->setText("Ready");
+}
+
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
     if (event->mimeData()->hasUrls()) {
         event->acceptProposedAction();
@@ -162,9 +220,8 @@ void MainWindow::dropEvent(QDropEvent *event) {
             QString fileName = urlList.first().toLocalFile();
             if (!fileName.isEmpty()) {
                 selectedFilePath = fileName;
-                updateDropZoneText();
-                saveButton->setVisible(false); // Reset state
-                log("Selected file: " + fileName.toStdString());
+                updateSmartUI();
+                log("Selected: " + fileName.toStdString());
             }
         }
     }
@@ -182,34 +239,24 @@ void MainWindow::log(const std::string& message) {
 }
 
 void MainWindow::setButtonsEnabled(bool enabled) {
-    compressButton->setEnabled(enabled);
-    decompressButton->setEnabled(enabled);
+    actionButton->setEnabled(enabled);
     dropZone->setEnabled(enabled);
 }
 
 void MainWindow::updateDropZoneText() {
-    if (selectedFilePath.isEmpty()) {
-        dropZone->setText("Drag & Drop File Here\nor Click to Browse");
-    } else {
-        QFileInfo fi(selectedFilePath);
-        dropZone->setText("Selected:\n" + fi.fileName());
-    }
+    // Deprecated by updateSmartUI, keeping empty or removing usage
 }
 
 void MainWindow::selectFile() {
     QString fileName = QFileDialog::getOpenFileName(this, "Select File");
     if (!fileName.isEmpty()) {
         selectedFilePath = fileName;
-        updateDropZoneText();
-        saveButton->setVisible(false);
+        updateSmartUI();
     }
 }
 
 void MainWindow::startCompression() {
-    if (selectedFilePath.isEmpty()) {
-        QMessageBox::warning(this, "Error", "Please select a file first.");
-        return;
-    }
+    if (selectedFilePath.isEmpty()) return;
 
     // Generate Temp Output Path
     QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
@@ -227,14 +274,11 @@ void MainWindow::startCompression() {
 }
 
 void MainWindow::startDecompression() {
-    if (selectedFilePath.isEmpty()) {
-        QMessageBox::warning(this, "Error", "Please select a file first.");
-        return;
-    }
+    if (selectedFilePath.isEmpty()) return;
 
     // Generate Temp Output Path
     QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-    currentTempFile = tempDir + "/huffpressor_temp.decompressed";
+    currentTempFile = tempDir + "/huffpressor_temp.decompressed"; // Will be renamed/extracted later
     isCompressionMode = false;
 
     statusLabel->setText("Decompressing...");
@@ -254,8 +298,21 @@ void MainWindow::handleResults(bool success, const QString& message) {
     
     if (success) {
         saveButton->setVisible(true);
-        // Flash the button or focus it?
         saveButton->setFocus();
+        actionButton->setVisible(false); // Hide action button to focus on saving
+
+        // Show New Size Stats
+        uint64_t newSize = getPathSize(currentTempFile);
+        QString stats = "Original: " + formatSize(originalSize) + "  ➜  New: " + formatSize(newSize);
+        
+        if (isCompressionMode && originalSize > 0) {
+            double ratio = (1.0 - (double)newSize / originalSize) * 100.0;
+            stats += QString(" (Saved %1%)").arg(ratio, 0, 'f', 1);
+        }
+        
+        fileInfoLabel->setText(stats);
+        fileInfoLabel->setStyleSheet("font-size: 16px; color: #4ec9b0; margin: 10px; font-weight: bold;");
+
     } else {
         QMessageBox::critical(this, "Error", message);
     }

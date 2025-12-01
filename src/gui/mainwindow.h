@@ -48,8 +48,8 @@ private:
     
     // UI Elements
     QPushButton *dropZone;      // The "Google Drive" style box
-    QPushButton *compressButton;
-    QPushButton *decompressButton;
+    QLabel *fileInfoLabel;      // Shows filename and original size
+    QPushButton *actionButton;  // Single smart button (Compress or Decompress)
     QPushButton *saveButton;    // The "Download" button
     QProgressBar *progressBar;
     QTextEdit *logOutput;
@@ -58,6 +58,7 @@ private:
     QString selectedFilePath;
     QString currentTempFile;
     bool isCompressionMode;     // To know if we are saving a .huff or .decompressed
+    uint64_t originalSize;
 
     QThread* workerThread;
     Worker* worker;
@@ -66,6 +67,11 @@ private:
     void log(const std::string& message);
     void setButtonsEnabled(bool enabled);
     void updateDropZoneText();
+    
+    // Helpers
+    uint64_t getPathSize(const QString& path);
+    QString formatSize(uint64_t bytes);
+    void updateSmartUI(); // Decides which button to show
 };
 
 #endif // MAINWINDOW_H
