@@ -6,10 +6,8 @@
 *.exe
 *.out
 *.app
-
-# Backup files
-*~
-*.bak
+*.dll
+*.pdb
 
 # Build directories
 /build/
@@ -21,13 +19,26 @@
 Makefile
 cmake_install.cmake
 
-# VSCode / CLion / CodeBlocks
+# IDE / Editor files
 .vscode/
 .idea/
 *.cbp
+*.sln
+*.vcxproj
+*.vcxproj.user
+*.user
 
-# Logs
+# Qt Generated files
+.qmake.stash
+*_autogen/
+
+# Logs and temporary files
 *.log
+*.tmp
 
-# Generated files
+# Project Data files (generated during testing)
 *.huff
+*.decompressed
+data/*.huff
+data/*.decompressed
+data/decompressed_*.txt
