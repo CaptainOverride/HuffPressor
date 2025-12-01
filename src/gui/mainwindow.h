@@ -7,6 +7,7 @@
 #include <QVBoxLayout>
 #include <QProgressBar>
 #include <QLineEdit>
+#include <QTextEdit>
 #include <QFileDialog>
 #include <QMessageBox>
 #include "compressor.h"
@@ -34,8 +35,10 @@ private:
     QPushButton *compressButton;
     QPushButton *decompressButton;
     QProgressBar *progressBar;
+    QTextEdit *logOutput;
 
     void setupUI();
+    void log(const std::string& message);
 };
 
 #endif // MAINWINDOW_H
