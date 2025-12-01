@@ -50,6 +50,8 @@ add_executable(HuffPressor
     src/gui/main.cpp
     src/gui/mainwindow.cpp
     src/gui/mainwindow.h
+    src/gui/worker.cpp
+    src/gui/worker.h
 )
 
 target_link_libraries(HuffPressor

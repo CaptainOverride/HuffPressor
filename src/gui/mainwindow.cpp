@@ -5,6 +5,22 @@
 #include <QApplication>
 #include <QFileInfo>
 #include <QScrollBar>
+#include <QMimeData>
+#include <QUrl>
+
+
+
+
+#include "mainwindow.h"
+#include "errors.h"
+#include "huffmanTree.h"
+#include <QThread>
+#include <QApplication>
+#include <QFileInfo>
+#include <QScrollBar>
+#include <QMimeData>
+#include <QUrl>
+#include <QStandardPaths> // Added for temp file paths
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -12,23 +28,27 @@ MainWindow::MainWindow(QWidget *parent)
     setupUI();
 }
 
-MainWindow::~MainWindow() {}
+
 
 void MainWindow::setupUI() {
     // Apply Dark Theme
     this->setStyleSheet(
         "QMainWindow { background-color: #1e1e1e; color: #ffffff; }"
         "QLabel { color: #ffffff; font-size: 14px; }"
-        "QLineEdit { "
-        "   background-color: #2d2d2d; color: #ffffff; border: 1px solid #3d3d3d; "
-        "   border-radius: 5px; padding: 8px; font-size: 14px; "
-        "}"
         "QPushButton { "
         "   background-color: #007acc; color: white; border: none; "
         "   border-radius: 5px; padding: 10px 20px; font-size: 14px; font-weight: bold;"
         "}"
         "QPushButton:hover { background-color: #005f9e; }"
         "QPushButton:pressed { background-color: #004a80; }"
+        "QPushButton:disabled { background-color: #3d3d3d; color: #888888; }"
+        "#dropZone { "
+        "   background-color: #252526; border: 2px dashed #555555; border-radius: 10px; "
+        "   color: #aaaaaa; font-size: 16px; padding: 40px; "
+        "}"
+        "#dropZone:hover { border-color: #007acc; color: #ffffff; background-color: #2d2d30; }"
+        "#saveButton { background-color: #2ea043; }" // Green for save
+        "#saveButton:hover { background-color: #238636; }"
         "QProgressBar { "
         "   border: 1px solid #3d3d3d; border-radius: 5px; text-align: center; color: white;"
         "   background-color: #2d2d2d;"
@@ -44,29 +64,32 @@ void MainWindow::setupUI() {
     setCentralWidget(centralWidget);
     
     layout = new QVBoxLayout(centralWidget);
+    layout->setSpacing(20);
+    layout->setContentsMargins(30, 30, 30, 30);
     
     // Title
-    QLabel *title = new QLabel("HuffPressor - File Compression Tool", this);
+    QLabel *title = new QLabel("HuffPressor", this);
     title->setAlignment(Qt::AlignCenter);
     QFont font = title->font();
     font.setBold(true);
-    font.setPointSize(16);
+    font.setPointSize(24);
     title->setFont(font);
     layout->addWidget(title);
 
-    // File Selection
-    QHBoxLayout *fileLayout = new QHBoxLayout();
-    filePathInput = new QLineEdit(this);
-    filePathInput->setPlaceholderText("Select a file...");
-    browseButton = new QPushButton("Browse", this);
-    fileLayout->addWidget(filePathInput);
-    fileLayout->addWidget(browseButton);
-    layout->addLayout(fileLayout);
+    // Drop Zone
+    dropZone = new QPushButton(this);
+    dropZone->setObjectName("dropZone");
+    dropZone->setText("Drag & Drop File Here\nor Click to Browse");
+    dropZone->setCursor(Qt::PointingHandCursor);
+    dropZone->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    layout->addWidget(dropZone);
 
-    // Buttons
+    // Action Buttons
     QHBoxLayout *actionLayout = new QHBoxLayout();
-    compressButton = new QPushButton("Compress", this);
-    decompressButton = new QPushButton("Decompress", this);
+    compressButton = new QPushButton("Compress File", this);
+    decompressButton = new QPushButton("Decompress File", this);
+    compressButton->setCursor(Qt::PointingHandCursor);
+    decompressButton->setCursor(Qt::PointingHandCursor);
     actionLayout->addWidget(compressButton);
     actionLayout->addWidget(decompressButton);
     layout->addLayout(actionLayout);
@@ -74,122 +97,194 @@ void MainWindow::setupUI() {
     // Progress
     progressBar = new QProgressBar(this);
     progressBar->setValue(0);
+    progressBar->setTextVisible(false); // Clean look
+    progressBar->setFixedHeight(5);     // Slim look
     layout->addWidget(progressBar);
+
+    // Save Button (Hidden initially)
+    saveButton = new QPushButton("Download / Save File", this);
+    saveButton->setObjectName("saveButton");
+    saveButton->setCursor(Qt::PointingHandCursor);
+    saveButton->setVisible(false);
+    layout->addWidget(saveButton);
 
     // Status
     statusLabel = new QLabel("Ready", this);
+    statusLabel->setAlignment(Qt::AlignCenter);
     layout->addWidget(statusLabel);
 
     // Log Output
     logOutput = new QTextEdit(this);
     logOutput->setReadOnly(true);
+    logOutput->setMaximumHeight(150);
     layout->addWidget(logOutput);
 
     // Connections
-    connect(browseButton, &QPushButton::clicked, this, &MainWindow::selectFile);
+    connect(dropZone, &QPushButton::clicked, this, &MainWindow::selectFile);
     connect(compressButton, &QPushButton::clicked, this, &MainWindow::startCompression);
     connect(decompressButton, &QPushButton::clicked, this, &MainWindow::startDecompression);
+    connect(saveButton, &QPushButton::clicked, this, &MainWindow::saveFile);
 
-    setMinimumSize(600, 500);
+    setMinimumSize(700, 600);
+
+    // Threading Setup
+    workerThread = new QThread(this);
+    worker = new Worker();
+    worker->moveToThread(workerThread);
+
+    // Connect Signals
+    connect(workerThread, &QThread::finished, worker, &QObject::deleteLater);
+    connect(this, &MainWindow::requestCompression, worker, &Worker::processCompression);
+    connect(this, &MainWindow::requestDecompression, worker, &Worker::processDecompression);
+    connect(worker, &Worker::progressUpdated, progressBar, &QProgressBar::setValue, Qt::QueuedConnection);
+    connect(worker, &Worker::logMessage, this, [this](const QString& msg){
+        log(msg.toStdString());
+    }, Qt::QueuedConnection);
+    connect(worker, &Worker::operationFinished, this, &MainWindow::handleResults, Qt::QueuedConnection);
+
+    workerThread->start();
+
+    // Enable Drag & Drop
+    setAcceptDrops(true);
+}
+
+void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
+    if (event->mimeData()->hasUrls()) {
+        event->acceptProposedAction();
+    }
+}
+
+void MainWindow::dropEvent(QDropEvent *event) {
+    const QMimeData *mimeData = event->mimeData();
+    if (mimeData->hasUrls()) {
+        QList<QUrl> urlList = mimeData->urls();
+        if (!urlList.isEmpty()) {
+            QString fileName = urlList.first().toLocalFile();
+            if (!fileName.isEmpty()) {
+                selectedFilePath = fileName;
+                updateDropZoneText();
+                saveButton->setVisible(false); // Reset state
+                log("Selected file: " + fileName.toStdString());
+            }
+        }
+    }
+}
+
+MainWindow::~MainWindow() {
+    workerThread->quit();
+    workerThread->wait();
 }
 
 void MainWindow::log(const std::string& message) {
     logOutput->append(QString::fromStdString(message));
-    // Auto-scroll to bottom
     QScrollBar *sb = logOutput->verticalScrollBar();
     sb->setValue(sb->maximum());
-    QApplication::processEvents();
+}
+
+void MainWindow::setButtonsEnabled(bool enabled) {
+    compressButton->setEnabled(enabled);
+    decompressButton->setEnabled(enabled);
+    dropZone->setEnabled(enabled);
+}
+
+void MainWindow::updateDropZoneText() {
+    if (selectedFilePath.isEmpty()) {
+        dropZone->setText("Drag & Drop File Here\nor Click to Browse");
+    } else {
+        QFileInfo fi(selectedFilePath);
+        dropZone->setText("Selected:\n" + fi.fileName());
+    }
 }
 
 void MainWindow::selectFile() {
     QString fileName = QFileDialog::getOpenFileName(this, "Select File");
     if (!fileName.isEmpty()) {
-        filePathInput->setText(fileName);
+        selectedFilePath = fileName;
+        updateDropZoneText();
+        saveButton->setVisible(false);
     }
 }
 
 void MainWindow::startCompression() {
-    QString inputFile = filePathInput->text();
-    if (inputFile.isEmpty()) {
+    if (selectedFilePath.isEmpty()) {
         QMessageBox::warning(this, "Error", "Please select a file first.");
         return;
     }
 
-    QString outputFile = inputFile + ".huff";
-    
+    // Generate Temp Output Path
+    QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    currentTempFile = tempDir + "/huffpressor_temp.huff";
+    isCompressionMode = true;
+
     statusLabel->setText("Compressing...");
     progressBar->setValue(0);
     logOutput->clear();
-    log("Starting compression for: " + inputFile.toStdString());
+    log("Starting compression...");
     
-    // TODO: Move to background thread
-    Compressor compressor;
-    HuffmanTree tree;
-    
-    compressor.setLogger([this](const std::string& msg){
-        log(msg);
-    });
-
-    compressor.setProgressCallback([this](float p){
-        progressBar->setValue(static_cast<int>(p));
-        QApplication::processEvents(); // Keep UI responsive (temporary hack)
-    });
-
-    if (compressor.readFileAndBuildFrequency(inputFile.toStdString()) != ErrorCode::Success) {
-        statusLabel->setText("Failed to read file.");
-        log("Error: Failed to read file.");
-        return;
-    }
-
-    tree.build(compressor.getFrequencyMap());
-    tree.generateCodes();
-
-    if (compressor.compressFile(inputFile.toStdString(), outputFile.toStdString(), tree.getHuffmanCodes(), tree.getRoot()) == ErrorCode::Success) {
-        statusLabel->setText("Compression Complete!");
-        log("Compression successful! Output: " + outputFile.toStdString());
-        QMessageBox::information(this, "Success", "File compressed successfully!");
-    } else {
-        statusLabel->setText("Compression Failed.");
-        log("Error: Compression failed.");
-    }
+    setButtonsEnabled(false);
+    saveButton->setVisible(false);
+    emit requestCompression(selectedFilePath, currentTempFile);
 }
 
 void MainWindow::startDecompression() {
-    QString inputFile = filePathInput->text();
-    if (inputFile.isEmpty()) {
+    if (selectedFilePath.isEmpty()) {
         QMessageBox::warning(this, "Error", "Please select a file first.");
         return;
     }
 
-    QString outputFile = inputFile + ".decompressed"; 
-    // Ideally strip .huff extension if present
-    if (inputFile.endsWith(".huff")) {
-        outputFile = inputFile.left(inputFile.length() - 5);
-    }
+    // Generate Temp Output Path
+    QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    currentTempFile = tempDir + "/huffpressor_temp.decompressed";
+    isCompressionMode = false;
 
     statusLabel->setText("Decompressing...");
     progressBar->setValue(0);
     logOutput->clear();
-    log("Starting decompression for: " + inputFile.toStdString());
+    log("Starting decompression...");
 
-    // TODO: Move to background thread
-    Decompressor decompressor;
+    setButtonsEnabled(false);
+    saveButton->setVisible(false);
+    emit requestDecompression(selectedFilePath, currentTempFile);
+}
+
+void MainWindow::handleResults(bool success, const QString& message) {
+    setButtonsEnabled(true);
+    statusLabel->setText(success ? "Processing Complete" : "Operation Failed");
+    log(message.toStdString());
     
-    decompressor.setLogger([this](const std::string& msg){
-        log(msg);
-    });
-
-    decompressor.setProgressCallback([this](float p){
-        progressBar->setValue(static_cast<int>(p));
-        QApplication::processEvents();
-    });
-
-    if (decompressor.decompressFile(inputFile.toStdString(), outputFile.toStdString()) == ErrorCode::Success) {
-        statusLabel->setText("Decompression Complete!");
-        log("Decompression successful! Output: " + outputFile.toStdString());
-        QMessageBox::information(this, "Success", "File decompressed successfully!");
+    if (success) {
+        saveButton->setVisible(true);
+        // Flash the button or focus it?
+        saveButton->setFocus();
     } else {
-        statusLabel->setText("Decompression Failed.");
-        log("Error: Decompression failed.");
+        QMessageBox::critical(this, "Error", message);
+    }
+}
+
+void MainWindow::saveFile() {
+    QString filter = isCompressionMode ? "HuffPressor Files (*.huff)" : "All Files (*.*)";
+    QString defaultName = selectedFilePath;
+    
+    if (isCompressionMode) {
+        defaultName += ".huff";
+    } else {
+        if (defaultName.endsWith(".huff")) {
+            defaultName = defaultName.left(defaultName.length() - 5);
+        } else {
+            defaultName += ".decompressed";
+        }
+    }
+
+    QString destination = QFileDialog::getSaveFileName(this, "Save File", defaultName, filter);
+    if (destination.isEmpty()) return;
+
+    // Move/Copy temp file to destination
+    QFile::remove(destination); // Overwrite if exists
+    if (QFile::copy(currentTempFile, destination)) {
+        QMessageBox::information(this, "Saved", "File saved successfully!");
+        log("File saved to: " + destination.toStdString());
+    } else {
+        QMessageBox::critical(this, "Error", "Failed to save file. Check permissions.");
+        log("Error: Failed to save file to " + destination.toStdString());
     }
 }
