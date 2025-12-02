@@ -39,6 +39,10 @@ void MainWindow::setupUI() {
         "#saveButton { background-color: #2ea043; }" // Green for save
         "#saveButton:hover { background-color: #238636; }"
         "#actionButton { background-color: #007acc; font-size: 16px; padding: 15px; }"
+        "#homeBtn { font-size: 18px; padding: 30px; margin: 10px; background-color: #2d2d30; border: 1px solid #3d3d3d; }"
+        "#homeBtn:hover { background-color: #3e3e42; border-color: #007acc; }"
+        "#backButton { background-color: transparent; color: #aaaaaa; font-size: 12px; padding: 5px; text-align: left; }"
+        "#backButton:hover { color: white; }"
         "QProgressBar { "
         "   border: 1px solid #3d3d3d; border-radius: 5px; text-align: center; color: white;"
         "   background-color: #2d2d2d;"
@@ -53,23 +57,104 @@ void MainWindow::setupUI() {
     centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
     
-    layout = new QVBoxLayout(centralWidget);
-    layout->setSpacing(20);
-    layout->setContentsMargins(30, 30, 30, 30);
-    
-    // Title
-    QLabel *title = new QLabel("HuffPressor", this);
+    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
+
+    stackedWidget = new QStackedWidget(this);
+    mainLayout->addWidget(stackedWidget);
+
+    setupHomePage();
+    setupProcessPage();
+
+    stackedWidget->setCurrentWidget(homePage);
+
+    setMinimumSize(800, 600);
+
+    // Threading Setup
+    workerThread = new QThread(this);
+    worker = new Worker();
+    worker->moveToThread(workerThread);
+
+    // Connect Signals
+    connect(workerThread, &QThread::finished, worker, &QObject::deleteLater);
+    connect(this, &MainWindow::requestCompression, worker, &Worker::processCompression);
+    connect(this, &MainWindow::requestDecompression, worker, &Worker::processDecompression);
+    connect(worker, &Worker::progressUpdated, progressBar, &QProgressBar::setValue, Qt::QueuedConnection);
+    connect(worker, &Worker::logMessage, this, [this](const QString& msg){
+        log(msg.toStdString());
+    }, Qt::QueuedConnection);
+    connect(worker, &Worker::operationFinished, this, &MainWindow::handleResults, Qt::QueuedConnection);
+
+    workerThread->start();
+
+    // Enable Drag & Drop
+    setAcceptDrops(true);
+}
+
+void MainWindow::setupHomePage() {
+    homePage = new QWidget(this);
+    QVBoxLayout *homeLayout = new QVBoxLayout(homePage);
+    homeLayout->setSpacing(30);
+    homeLayout->setAlignment(Qt::AlignCenter);
+
+    QLabel *title = new QLabel("HuffPressor", homePage);
     title->setAlignment(Qt::AlignCenter);
     QFont font = title->font();
     font.setBold(true);
-    font.setPointSize(24);
+    font.setPointSize(32);
     title->setFont(font);
-    layout->addWidget(title);
+    homeLayout->addWidget(title);
+
+    QLabel *subtitle = new QLabel("Advanced Huffman Compression Tool", homePage);
+    subtitle->setAlignment(Qt::AlignCenter);
+    subtitle->setStyleSheet("color: #aaaaaa; font-size: 18px;");
+    homeLayout->addWidget(subtitle);
+
+    QHBoxLayout *btnLayout = new QHBoxLayout();
+    btnLayout->setSpacing(20);
+
+    compressFileBtn = new QPushButton("📄 Compress File", homePage);
+    compressFileBtn->setObjectName("homeBtn");
+    compressFileBtn->setCursor(Qt::PointingHandCursor);
+    compressFileBtn->setFixedSize(250, 200);
+
+    compressFolderBtn = new QPushButton("📂 Compress Folder", homePage);
+    compressFolderBtn->setObjectName("homeBtn");
+    compressFolderBtn->setCursor(Qt::PointingHandCursor);
+    compressFolderBtn->setFixedSize(250, 200);
+
+    btnLayout->addWidget(compressFileBtn);
+    btnLayout->addWidget(compressFolderBtn);
+    homeLayout->addLayout(btnLayout);
+
+    QLabel *hint = new QLabel("Or drag and drop a .huff file anywhere to decompress", homePage);
+    hint->setAlignment(Qt::AlignCenter);
+    hint->setStyleSheet("color: #666666; margin-top: 20px;");
+    homeLayout->addWidget(hint);
+
+    connect(compressFileBtn, &QPushButton::clicked, this, [this](){ switchToProcessPage(false); });
+    connect(compressFolderBtn, &QPushButton::clicked, this, [this](){ switchToProcessPage(true); });
+
+    stackedWidget->addWidget(homePage);
+}
+
+void MainWindow::setupProcessPage() {
+    processPage = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(processPage);
+    layout->setSpacing(20);
+    layout->setContentsMargins(30, 30, 30, 30);
+
+    // Back Button
+    backButton = new QPushButton("← Back to Home", processPage);
+    backButton->setObjectName("backButton");
+    backButton->setCursor(Qt::PointingHandCursor);
+    backButton->setFixedWidth(120);
+    connect(backButton, &QPushButton::clicked, this, &MainWindow::goBack);
+    layout->addWidget(backButton);
 
     // Drop Zone
     dropZone = new QPushButton(this);
     dropZone->setObjectName("dropZone");
-    dropZone->setText("Drag & Drop File/Folder Here\nor Click to Browse");
     dropZone->setCursor(Qt::PointingHandCursor);
     dropZone->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     layout->addWidget(dropZone);
@@ -116,29 +201,33 @@ void MainWindow::setupUI() {
     // Connections
     connect(dropZone, &QPushButton::clicked, this, &MainWindow::selectFile);
     connect(saveButton, &QPushButton::clicked, this, &MainWindow::saveFile);
-    // actionButton connection is dynamic or handled in a slot
 
-    setMinimumSize(700, 600);
+    stackedWidget->addWidget(processPage);
+}
 
-    // Threading Setup
-    workerThread = new QThread(this);
-    worker = new Worker();
-    worker->moveToThread(workerThread);
+void MainWindow::switchToProcessPage(bool folderMode) {
+    isFolderMode = folderMode;
+    selectedFilePath.clear();
+    
+    // Reset UI
+    fileInfoLabel->setVisible(false);
+    actionButton->setVisible(false);
+    saveButton->setVisible(false);
+    progressBar->setValue(0);
+    logOutput->clear();
+    statusLabel->setText("Ready");
 
-    // Connect Signals
-    connect(workerThread, &QThread::finished, worker, &QObject::deleteLater);
-    connect(this, &MainWindow::requestCompression, worker, &Worker::processCompression);
-    connect(this, &MainWindow::requestDecompression, worker, &Worker::processDecompression);
-    connect(worker, &Worker::progressUpdated, progressBar, &QProgressBar::setValue, Qt::QueuedConnection);
-    connect(worker, &Worker::logMessage, this, [this](const QString& msg){
-        log(msg.toStdString());
-    }, Qt::QueuedConnection);
-    connect(worker, &Worker::operationFinished, this, &MainWindow::handleResults, Qt::QueuedConnection);
+    if (isFolderMode) {
+        dropZone->setText("Drag & Drop FOLDER Here\nor Click to Browse");
+    } else {
+        dropZone->setText("Drag & Drop FILE Here\nor Click to Browse");
+    }
 
-    workerThread->start();
+    stackedWidget->setCurrentWidget(processPage);
+}
 
-    // Enable Drag & Drop
-    setAcceptDrops(true);
+void MainWindow::goBack() {
+    stackedWidget->setCurrentWidget(homePage);
 }
 
 uint64_t MainWindow::getPathSize(const QString& path) {
@@ -192,12 +281,25 @@ void MainWindow::updateSmartUI() {
         // It's a compressed file -> Decompress
         actionButton->setText("Decompress File");
         connect(actionButton, &QPushButton::clicked, this, &MainWindow::startDecompression);
-        isCompressionMode = false; // Will be set to false
+        isCompressionMode = false; 
     } else {
         // It's a file or folder -> Compress
+        if (isFolderMode && !fi.isDir()) {
+            QMessageBox::warning(this, "Invalid Input", "You selected 'Compress Folder' but dropped a file.\nPlease drop a folder.");
+            selectedFilePath.clear();
+            updateSmartUI(); // Reset
+            return;
+        }
+        if (!isFolderMode && fi.isDir()) {
+            QMessageBox::warning(this, "Invalid Input", "You selected 'Compress File' but dropped a folder.\nPlease drop a file.");
+            selectedFilePath.clear();
+            updateSmartUI(); // Reset
+            return;
+        }
+
         actionButton->setText("Compress " + (fi.isDir() ? QString("Folder") : QString("File")));
         connect(actionButton, &QPushButton::clicked, this, &MainWindow::startCompression);
-        isCompressionMode = true; // Will be set to true
+        isCompressionMode = true; 
     }
     
     actionButton->setVisible(true);
@@ -219,6 +321,19 @@ void MainWindow::dropEvent(QDropEvent *event) {
         if (!urlList.isEmpty()) {
             QString fileName = urlList.first().toLocalFile();
             if (!fileName.isEmpty()) {
+                // If on home page, auto-detect mode if it's a .huff file
+                if (stackedWidget->currentWidget() == homePage) {
+                    if (fileName.endsWith(".huff")) {
+                        switchToProcessPage(false); // Mode doesn't matter for decompress really
+                        selectedFilePath = fileName;
+                        updateSmartUI();
+                        return;
+                    }
+                    // Otherwise ignore drops on home page or auto-switch?
+                    // Let's ignore to force user choice.
+                    return;
+                }
+
                 selectedFilePath = fileName;
                 updateSmartUI();
                 log("Selected: " + fileName.toStdString());
@@ -241,14 +356,17 @@ void MainWindow::log(const std::string& message) {
 void MainWindow::setButtonsEnabled(bool enabled) {
     actionButton->setEnabled(enabled);
     dropZone->setEnabled(enabled);
-}
-
-void MainWindow::updateDropZoneText() {
-    // Deprecated by updateSmartUI, keeping empty or removing usage
+    backButton->setEnabled(enabled);
 }
 
 void MainWindow::selectFile() {
-    QString fileName = QFileDialog::getOpenFileName(this, "Select File");
+    QString fileName;
+    if (isFolderMode) {
+        fileName = QFileDialog::getExistingDirectory(this, "Select Folder to Compress");
+    } else {
+        fileName = QFileDialog::getOpenFileName(this, "Select File to Compress");
+    }
+    
     if (!fileName.isEmpty()) {
         selectedFilePath = fileName;
         updateSmartUI();
@@ -337,11 +455,45 @@ void MainWindow::saveFile() {
 
     // Move/Copy temp file to destination
     QFile::remove(destination); // Overwrite if exists
-    if (QFile::copy(currentTempFile, destination)) {
-        QMessageBox::information(this, "Saved", "File saved successfully!");
-        log("File saved to: " + destination.toStdString());
+    
+    // If it's a folder extraction (decompression of archive), currentTempFile is actually a directory?
+    // Wait, in Worker::processDecompression:
+    // If archive: extractArchive(tempDecompPath, outputFile)
+    // So 'outputFile' (currentTempFile) becomes a directory containing extracted files.
+    
+    QFileInfo tempFi(currentTempFile);
+    if (tempFi.isDir()) {
+        // We need to copy the *directory* to the destination.
+        // QFileDialog::getSaveFileName returns a filename, not a directory.
+        // But for folder extraction, we probably want to save as a folder.
+        // This is tricky with getSaveFileName.
+        
+        // If the user picked a name "MyFolder", we should create "MyFolder" and copy contents.
+        // Or if they picked "MyFolder.decompressed", we create that dir.
+        
+        // Simple recursive copy:
+        auto copyRecursively = [](const fs::path& src, const fs::path& dest) {
+            try {
+                fs::copy(src, dest, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+                return true;
+            } catch (...) { return false; }
+        };
+
+        if (copyRecursively(currentTempFile.toStdString(), destination.toStdString())) {
+             QMessageBox::information(this, "Saved", "Folder extracted successfully!");
+             log("Folder saved to: " + destination.toStdString());
+        } else {
+             QMessageBox::critical(this, "Error", "Failed to save folder.");
+        }
     } else {
-        QMessageBox::critical(this, "Error", "Failed to save file. Check permissions.");
-        log("Error: Failed to save file to " + destination.toStdString());
+        // Normal file copy
+        if (QFile::copy(currentTempFile, destination)) {
+            QMessageBox::information(this, "Saved", "File saved successfully!");
+            log("File saved to: " + destination.toStdString());
+        } else {
+            QMessageBox::critical(this, "Error", "Failed to save file. Check permissions.");
+            log("Error: Failed to save file to " + destination.toStdString());
+        }
     }
 }
+

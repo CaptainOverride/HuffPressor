@@ -5,6 +5,7 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QVBoxLayout>
+#include <QStackedWidget>
 #include <QProgressBar>
 #include <QLineEdit>
 #include <QTextEdit>
@@ -44,34 +45,48 @@ signals:
 private:
     QWidget *centralWidget;
     QVBoxLayout *layout;
-    QLabel *statusLabel;
-    
     // UI Elements
+    QStackedWidget *stackedWidget;
+    QWidget *homePage;
+    QWidget *processPage;
+
+    // Home Page
+    QPushButton *compressFileBtn;
+    QPushButton *compressFolderBtn;
+
+    // Process Page
+    QPushButton *backButton;
     QPushButton *dropZone;      // The "Google Drive" style box
     QLabel *fileInfoLabel;      // Shows filename and original size
     QPushButton *actionButton;  // Single smart button (Compress or Decompress)
     QPushButton *saveButton;    // The "Download" button
     QProgressBar *progressBar;
     QTextEdit *logOutput;
+    QLabel *statusLabel;
 
     // State
     QString selectedFilePath;
     QString currentTempFile;
     bool isCompressionMode;     // To know if we are saving a .huff or .decompressed
+    bool isFolderMode;          // True if user selected "Compress Folder"
     uint64_t originalSize;
 
     QThread* workerThread;
     Worker* worker;
 
     void setupUI();
+    void setupHomePage();
+    void setupProcessPage();
+    
     void log(const std::string& message);
     void setButtonsEnabled(bool enabled);
-    void updateDropZoneText();
     
     // Helpers
     uint64_t getPathSize(const QString& path);
     QString formatSize(uint64_t bytes);
     void updateSmartUI(); // Decides which button to show
+    void switchToProcessPage(bool folderMode);
+    void goBack();
 };
 
 #endif // MAINWINDOW_H
