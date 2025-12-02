@@ -110,7 +110,13 @@ void Worker::processDecompression(const QString& inputFile, const QString& outpu
             // However, the UI passes a specific temp file path.
             // Let's extract to a folder with that name.
             
-            ErrorCode extractResult = Archiver::extractArchive(tempDecompPath, outputFile.toStdString());
+            // Ensure output directory is clean
+            std::string outPath = outputFile.toStdString();
+            if (fs::exists(outPath)) {
+                fs::remove_all(outPath);
+            }
+
+            ErrorCode extractResult = Archiver::extractArchive(tempDecompPath, outPath);
             fs::remove(tempDecompPath); // Clean up temp
 
             if (extractResult == ErrorCode::Success) {

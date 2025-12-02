@@ -437,41 +437,39 @@ void MainWindow::handleResults(bool success, const QString& message) {
 }
 
 void MainWindow::saveFile() {
-    QString filter = isCompressionMode ? "HuffPressor Files (*.huff)" : "All Files (*.*)";
-    QString defaultName = selectedFilePath;
-    
-    if (isCompressionMode) {
-        defaultName += ".huff";
-    } else {
-        if (defaultName.endsWith(".huff")) {
-            defaultName = defaultName.left(defaultName.length() - 5);
-        } else {
-            defaultName += ".decompressed";
-        }
-    }
-
-    QString destination = QFileDialog::getSaveFileName(this, "Save File", defaultName, filter);
-    if (destination.isEmpty()) return;
-
-    // Move/Copy temp file to destination
-    QFile::remove(destination); // Overwrite if exists
-    
-    // If it's a folder extraction (decompression of archive), currentTempFile is actually a directory?
-    // Wait, in Worker::processDecompression:
-    // If archive: extractArchive(tempDecompPath, outputFile)
-    // So 'outputFile' (currentTempFile) becomes a directory containing extracted files.
-    
     QFileInfo tempFi(currentTempFile);
+    
     if (tempFi.isDir()) {
-        // We need to copy the *directory* to the destination.
-        // QFileDialog::getSaveFileName returns a filename, not a directory.
-        // But for folder extraction, we probably want to save as a folder.
-        // This is tricky with getSaveFileName.
-        
-        // If the user picked a name "MyFolder", we should create "MyFolder" and copy contents.
-        // Or if they picked "MyFolder.decompressed", we create that dir.
-        
-        // Simple recursive copy:
+        // We are saving a FOLDER (Extracted Archive)
+        // Ask user where to put it
+        QString targetDir = QFileDialog::getExistingDirectory(this, "Select Destination Folder for Extraction");
+        if (targetDir.isEmpty()) return;
+
+        // Determine the output folder name
+        // Use the original archive name (e.g., "Data" from "Data.huff")
+        QFileInfo originalFi(selectedFilePath);
+        QString folderName = originalFi.completeBaseName();
+        if (folderName.isEmpty()) folderName = "Decompressed_Output";
+
+        QString destination = targetDir + "/" + folderName;
+
+        // Check if destination already exists
+        if (fs::exists(destination.toStdString())) {
+            auto reply = QMessageBox::question(this, "Overwrite?", 
+                "Folder '" + folderName + "' already exists in the destination.\nDo you want to overwrite it?",
+                QMessageBox::Yes | QMessageBox::No);
+            if (reply == QMessageBox::No) return;
+            
+            // Remove existing to overwrite
+            try {
+                fs::remove_all(destination.toStdString());
+            } catch (const std::exception& e) {
+                QMessageBox::critical(this, "Error", QString("Failed to remove existing folder: ") + e.what());
+                return;
+            }
+        }
+
+        // Copy recursively
         auto copyRecursively = [](const fs::path& src, const fs::path& dest) {
             try {
                 fs::copy(src, dest, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
@@ -480,13 +478,32 @@ void MainWindow::saveFile() {
         };
 
         if (copyRecursively(currentTempFile.toStdString(), destination.toStdString())) {
-             QMessageBox::information(this, "Saved", "Folder extracted successfully!");
+             QMessageBox::information(this, "Saved", "Folder extracted successfully to:\n" + destination);
              log("Folder saved to: " + destination.toStdString());
         } else {
              QMessageBox::critical(this, "Error", "Failed to save folder.");
         }
+
     } else {
-        // Normal file copy
+        // We are saving a FILE
+        QString filter = isCompressionMode ? "HuffPressor Files (*.huff)" : "All Files (*.*)";
+        QString defaultName = selectedFilePath;
+        
+        if (isCompressionMode) {
+            defaultName += ".huff";
+        } else {
+            if (defaultName.endsWith(".huff")) {
+                defaultName = defaultName.left(defaultName.length() - 5);
+            } else {
+                defaultName += ".decompressed";
+            }
+        }
+
+        QString destination = QFileDialog::getSaveFileName(this, "Save File", defaultName, filter);
+        if (destination.isEmpty()) return;
+
+        // Move/Copy temp file to destination
+        QFile::remove(destination); // Overwrite if exists
         if (QFile::copy(currentTempFile, destination)) {
             QMessageBox::information(this, "Saved", "File saved successfully!");
             log("File saved to: " + destination.toStdString());
