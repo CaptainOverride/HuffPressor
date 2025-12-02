@@ -53,6 +53,8 @@ add_executable(HuffPressor
     src/gui/mainWindow.h
     src/gui/worker.cpp
     src/gui/worker.h
+    resources/resources.qrc
+    resources/windows_icon.rc
 )
 
 target_link_libraries(HuffPressor
