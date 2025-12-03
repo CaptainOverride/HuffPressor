@@ -127,7 +127,7 @@ void MainWindow::setupHomePage() {
     btnLayout->addWidget(compressFolderBtn);
     homeLayout->addLayout(btnLayout);
 
-    QLabel *hint = new QLabel("Or drag and drop a .huff file anywhere to decompress", homePage);
+    QLabel *hint = new QLabel("Or drag and drop a .hpf / .hpa file anywhere to decompress", homePage);
     hint->setAlignment(Qt::AlignCenter);
     hint->setStyleSheet("color: #666666; margin-top: 20px;");
     homeLayout->addWidget(hint);
@@ -277,9 +277,10 @@ void MainWindow::updateSmartUI() {
     // Determine Action
     actionButton->disconnect(); // Remove old connections
     
-    if (fi.suffix() == "huff") {
+    QString suffix = fi.suffix().toLower();
+    if (suffix == "hpf" || suffix == "hpa") {
         // It's a compressed file -> Decompress
-        actionButton->setText("Decompress File");
+        actionButton->setText("Decompress " + (suffix == "hpa" ? QString("Archive") : QString("File")));
         connect(actionButton, &QPushButton::clicked, this, &MainWindow::startDecompression);
         isCompressionMode = false; 
     } else {
@@ -321,16 +322,15 @@ void MainWindow::dropEvent(QDropEvent *event) {
         if (!urlList.isEmpty()) {
             QString fileName = urlList.first().toLocalFile();
             if (!fileName.isEmpty()) {
-                // If on home page, auto-detect mode if it's a .huff file
+                // If on home page, auto-detect mode if it's a compressed file
                 if (stackedWidget->currentWidget() == homePage) {
-                    if (fileName.endsWith(".huff")) {
+                    QString suffix = QFileInfo(fileName).suffix().toLower();
+                    if (suffix == "hpf" || suffix == "hpa") {
                         switchToProcessPage(false); // Mode doesn't matter for decompress really
                         selectedFilePath = fileName;
                         updateSmartUI();
                         return;
                     }
-                    // Otherwise ignore drops on home page or auto-switch?
-                    // Let's ignore to force user choice.
                     return;
                 }
 
@@ -378,7 +378,8 @@ void MainWindow::startCompression() {
 
     // Generate Temp Output Path
     QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-    currentTempFile = tempDir + "/huffpressor_temp.huff";
+    QString ext = isFolderMode ? ".hpa" : ".hpf";
+    currentTempFile = tempDir + "/huffpressor_temp" + ext;
     isCompressionMode = true;
 
     statusLabel->setText("Compressing...");
@@ -446,7 +447,7 @@ void MainWindow::saveFile() {
         if (targetDir.isEmpty()) return;
 
         // Determine the output folder name
-        // Use the original archive name (e.g., "Data" from "Data.huff")
+        // Use the original archive name (e.g., "Data" from "Data.hpa")
         QFileInfo originalFi(selectedFilePath);
         QString folderName = originalFi.completeBaseName();
         if (folderName.isEmpty()) folderName = "Decompressed_Output";
@@ -486,14 +487,15 @@ void MainWindow::saveFile() {
 
     } else {
         // We are saving a FILE
-        QString filter = isCompressionMode ? "HuffPressor Files (*.huff)" : "All Files (*.*)";
+        QString filter = isCompressionMode ? "HuffPressor File (*.hpf);;HuffPressor Archive (*.hpa);;All Files (*.*)" : "All Files (*.*)";
         QString defaultName = selectedFilePath;
         
         if (isCompressionMode) {
-            defaultName += ".huff";
+            defaultName += (isFolderMode ? ".hpa" : ".hpf");
         } else {
-            if (defaultName.endsWith(".huff")) {
-                defaultName = defaultName.left(defaultName.length() - 5);
+            // Decompression: Remove extension
+            if (defaultName.endsWith(".hpf") || defaultName.endsWith(".hpa")) {
+                defaultName = defaultName.left(defaultName.length() - 4);
             } else {
                 defaultName += ".decompressed";
             }
