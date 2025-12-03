@@ -504,7 +504,14 @@ void MainWindow::setButtonsEnabled(bool enabled) {
 void MainWindow::selectFile() {
     QString fileName;
     if (isFolderMode) {
-        fileName = QFileDialog::getExistingDirectory(this, "Select Folder to Compress");
+        if (isCompressionMode) {
+            // Compressing a folder
+            fileName = QFileDialog::getExistingDirectory(this, "Select Folder to Compress");
+        } else {
+            // Decompressing an archive - show .hpa files
+            fileName = QFileDialog::getOpenFileName(this, "Select Archive to Decompress", "", 
+                "HuffPressor Archive (*.hpa)");
+        }
     } else {
         // Different filters based on compression vs decompression mode
         if (isCompressionMode) {
@@ -514,7 +521,7 @@ void MainWindow::selectFile() {
         } else {
             // For decompression: only allow .hpf files
             fileName = QFileDialog::getOpenFileName(this, "Select Compressed File", "", 
-                "HuffPressor Files (*.hpf)");
+                "HuffPressor File (*.hpf)");
         }
     }
     
