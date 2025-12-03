@@ -494,7 +494,7 @@ void MainWindow::saveFile() {
             defaultName += (isFolderMode ? ".hpa" : ".hpf");
         } else {
             // Decompression: Remove extension
-            if (defaultName.endsWith(".hpf") || defaultName.endsWith(".hpa")) {
+            if (defaultName.endsWith(".hpf", Qt::CaseInsensitive) || defaultName.endsWith(".hpa", Qt::CaseInsensitive)) {
                 defaultName = defaultName.left(defaultName.length() - 4);
             } else {
                 defaultName += ".decompressed";
