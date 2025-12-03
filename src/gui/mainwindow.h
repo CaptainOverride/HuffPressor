@@ -53,10 +53,13 @@ private:
     // Home Page
     QPushButton *compressFileBtn;
     QPushButton *compressFolderBtn;
+    QPushButton *decompressFileBtn;
+    QPushButton *decompressFolderBtn;
 
     // Process Page
     QPushButton *backButton;
     QPushButton *dropZone;      // The "Google Drive" style box
+    QLabel *hintLabel;          // Supported extensions hint
     QLabel *fileInfoLabel;      // Shows filename and original size
     QPushButton *actionButton;  // Single smart button (Compress or Decompress)
     QPushButton *saveButton;    // The "Download" button

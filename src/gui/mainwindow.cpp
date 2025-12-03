@@ -21,36 +21,69 @@ MainWindow::MainWindow(QWidget *parent)
 
 void MainWindow::setupUI() {
     // Apply Dark Theme
+    // Apply Cyberpunk / Futuristic Theme
     this->setStyleSheet(
-        "QMainWindow { background-color: #1e1e1e; color: #ffffff; }"
-        "QLabel { color: #ffffff; font-size: 14px; }"
+        "QMainWindow { "
+        "   background: qradialgradient(cx:0.5, cy:0.5, radius: 1, fx:0.5, fy:0.5, stop:0 #1b2735, stop:1 #090a0f); "
+        "   font-family: 'Segoe UI', sans-serif; "
+        "}"
+        "QLabel { color: #e0e0e0; font-size: 14px; background: transparent; }"
+        
+        // Action Buttons (Neon Blue/Purple)
         "QPushButton { "
-        "   background-color: #007acc; color: white; border: none; "
-        "   border-radius: 5px; padding: 10px 20px; font-size: 14px; font-weight: bold;"
+        "   background-color: rgba(0, 0, 0, 0.3); "
+        "   color: #00e5ff; border: 1px solid #00e5ff; "
+        "   border-radius: 8px; padding: 12px 24px; font-size: 14px; font-weight: bold; letter-spacing: 1px;"
         "}"
-        "QPushButton:hover { background-color: #005f9e; }"
-        "QPushButton:pressed { background-color: #004a80; }"
-        "QPushButton:disabled { background-color: #3d3d3d; color: #888888; }"
+        "QPushButton:hover { "
+        "   background-color: rgba(0, 229, 255, 0.1); "
+        "   color: #ffffff; "
+        "   border: 1px solid #ffffff; "
+        "}"
+        "QPushButton:pressed { background-color: rgba(0, 229, 255, 0.2); }"
+        "QPushButton:disabled { border-color: #444; color: #444; }"
+        
+        // Drop Zone (Holographic)
         "#dropZone { "
-        "   background-color: #252526; border: 2px dashed #555555; border-radius: 10px; "
-        "   color: #aaaaaa; font-size: 16px; padding: 40px; "
+        "   background-color: rgba(0, 0, 0, 0.2); border: 2px dashed #00e5ff; border-radius: 16px; "
+        "   color: #00e5ff; font-size: 20px; padding: 40px; font-weight: bold;"
         "}"
-        "#dropZone:hover { border-color: #007acc; color: #ffffff; background-color: #2d2d30; }"
-        "#saveButton { background-color: #2ea043; }" // Green for save
-        "#saveButton:hover { background-color: #238636; }"
-        "#actionButton { background-color: #007acc; font-size: 16px; padding: 15px; }"
-        "#homeBtn { font-size: 18px; padding: 30px; margin: 10px; background-color: #2d2d30; border: 1px solid #3d3d3d; }"
-        "#homeBtn:hover { background-color: #3e3e42; border-color: #007acc; }"
-        "#backButton { background-color: transparent; color: #aaaaaa; font-size: 12px; padding: 5px; text-align: left; }"
-        "#backButton:hover { color: white; }"
+        "#dropZone:hover { "
+        "   background-color: rgba(0, 229, 255, 0.05); border-color: #ffffff; color: #ffffff; "
+        "}"
+        
+        // Save Button (Neon Green)
+        "#saveButton { border-color: #00ff00; color: #00ff00; }"
+        "#saveButton:hover { background-color: rgba(0, 255, 0, 0.1); color: #ffffff; border-color: #ffffff; }"
+        
+        // Action Button (Neon Pink)
+        "#actionButton { border-color: #ff00ff; color: #ff00ff; }"
+        "#actionButton:hover { background-color: rgba(255, 0, 255, 0.1); color: #ffffff; border-color: #ffffff; }"
+        
+        // Home Cards (Glass Panels)
+        "#homeBtn { "
+        "   background-color: rgba(255, 255, 255, 0.03); "
+        "   border: 1px solid rgba(255, 255, 255, 0.1); "
+        "   border-radius: 16px; font-size: 18px; padding: 20px; text-align: center; color: #e0e0e0;"
+        "}"
+        "#homeBtn:hover { "
+        "   background-color: rgba(255, 255, 255, 0.08); "
+        "   border: 1px solid #00e5ff; color: #ffffff;"
+        "}"
+        
+        "#backButton { border: none; color: #888; text-align: left; padding: 0; }"
+        "#backButton:hover { color: #00e5ff; background: transparent; border: none; }"
+        
         "QProgressBar { "
-        "   border: 1px solid #3d3d3d; border-radius: 5px; text-align: center; color: white;"
-        "   background-color: #2d2d2d;"
+        "   border: 1px solid #333; background-color: #000; border-radius: 4px; height: 6px; text-align: center;"
         "}"
-        "QProgressBar::chunk { background-color: #007acc; border-radius: 4px; }"
+        "QProgressBar::chunk { "
+        "   background-color: #00e5ff; border-radius: 4px; "
+        "}"
+        
         "QTextEdit { "
-        "   background-color: #1e1e1e; color: #d4d4d4; border: 1px solid #3d3d3d; "
-        "   border-radius: 5px; font-family: Consolas, monospace; font-size: 12px;"
+        "   background-color: rgba(0, 0, 0, 0.5); color: #00ff00; border: 1px solid #333; "
+        "   border-radius: 8px; font-family: 'Consolas', monospace; font-size: 12px; padding: 12px;"
         "}"
     );
 
@@ -94,46 +127,107 @@ void MainWindow::setupUI() {
 void MainWindow::setupHomePage() {
     homePage = new QWidget(this);
     QVBoxLayout *homeLayout = new QVBoxLayout(homePage);
-    homeLayout->setSpacing(30);
+    homeLayout->setSpacing(20);
     homeLayout->setAlignment(Qt::AlignCenter);
+    homeLayout->setContentsMargins(40, 40, 40, 40);
 
+    // Title
     QLabel *title = new QLabel("HuffPressor", homePage);
     title->setAlignment(Qt::AlignCenter);
-    QFont font = title->font();
+    QFont font("Segoe UI");
     font.setBold(true);
-    font.setPointSize(32);
+    font.setPointSize(42);
     title->setFont(font);
+    title->setStyleSheet("color: #00e5ff; letter-spacing: 3px; text-shadow: 0 0 20px rgba(0, 229, 255, 0.5);");
     homeLayout->addWidget(title);
 
     QLabel *subtitle = new QLabel("Advanced Huffman Compression Tool", homePage);
     subtitle->setAlignment(Qt::AlignCenter);
-    subtitle->setStyleSheet("color: #aaaaaa; font-size: 18px;");
+    subtitle->setStyleSheet("color: #66b3cc; font-size: 16px; margin-bottom: 20px;");
     homeLayout->addWidget(subtitle);
 
-    QHBoxLayout *btnLayout = new QHBoxLayout();
-    btnLayout->setSpacing(20);
+    homeLayout->addStretch(1);
 
-    compressFileBtn = new QPushButton("📄 Compress File", homePage);
+    // Grid Layout for Buttons
+    QGridLayout *gridLayout = new QGridLayout();
+    gridLayout->setSpacing(30);
+    gridLayout->setAlignment(Qt::AlignCenter);
+
+    // Row 1: Compression
+    compressFileBtn = new QPushButton("📄\nCompress File", homePage);
     compressFileBtn->setObjectName("homeBtn");
     compressFileBtn->setCursor(Qt::PointingHandCursor);
-    compressFileBtn->setFixedSize(250, 200);
+    compressFileBtn->setMinimumSize(220, 140);
 
-    compressFolderBtn = new QPushButton("📂 Compress Folder", homePage);
+    compressFolderBtn = new QPushButton("📂\nCompress Folder", homePage);
     compressFolderBtn->setObjectName("homeBtn");
     compressFolderBtn->setCursor(Qt::PointingHandCursor);
-    compressFolderBtn->setFixedSize(250, 200);
+    compressFolderBtn->setMinimumSize(220, 140);
 
-    btnLayout->addWidget(compressFileBtn);
-    btnLayout->addWidget(compressFolderBtn);
-    homeLayout->addLayout(btnLayout);
+    // Row 2: Decompression
+    decompressFileBtn = new QPushButton("🔓\nDecompress File", homePage);
+    decompressFileBtn->setObjectName("homeBtn");
+    decompressFileBtn->setCursor(Qt::PointingHandCursor);
+    decompressFileBtn->setMinimumSize(220, 140);
 
-    QLabel *hint = new QLabel("Or drag and drop a .hpf / .hpa file anywhere to decompress", homePage);
-    hint->setAlignment(Qt::AlignCenter);
-    hint->setStyleSheet("color: #666666; margin-top: 20px;");
-    homeLayout->addWidget(hint);
+    decompressFolderBtn = new QPushButton("📦\nDecompress Folder", homePage);
+    decompressFolderBtn->setObjectName("homeBtn");
+    decompressFolderBtn->setCursor(Qt::PointingHandCursor);
+    decompressFolderBtn->setMinimumSize(220, 140);
 
-    connect(compressFileBtn, &QPushButton::clicked, this, [this](){ switchToProcessPage(false); });
-    connect(compressFolderBtn, &QPushButton::clicked, this, [this](){ switchToProcessPage(true); });
+    gridLayout->addWidget(compressFileBtn, 0, 0);
+    gridLayout->addWidget(compressFolderBtn, 0, 1);
+    gridLayout->addWidget(decompressFileBtn, 1, 0);
+    gridLayout->addWidget(decompressFolderBtn, 1, 1);
+
+    homeLayout->addLayout(gridLayout);
+
+    homeLayout->addStretch(2);
+
+    // Footer
+    QLabel *footer = new QLabel(homePage);
+    footer->setTextFormat(Qt::RichText);
+    footer->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    footer->setOpenExternalLinks(true);
+    footer->setAlignment(Qt::AlignCenter);
+    footer->setText(
+        "<span style='color: #555; font-size: 11px;'>v1.0.0 • C++ & Qt • Created by </span>"
+        "<a href='https://github.com/CaptainOverride' style='color: #00e5ff; text-decoration: none; font-weight: bold; font-size: 11px;'>CaptainOverride</a>"
+    );
+    homeLayout->addWidget(footer);
+
+    // Connections
+    connect(compressFileBtn, &QPushButton::clicked, this, [this](){ 
+        switchToProcessPage(false); 
+        isCompressionMode = true;
+        dropZone->setText("Drag && Drop File Here\nor Click to Browse");
+        hintLabel->setText("Supported: .txt, .md, .cpp, .py, .json, .xml, .html, .css, .log, .csv");
+        hintLabel->setStyleSheet("color: #00e5ff; font-weight: bold; font-size: 13px;");
+    });
+    
+    connect(compressFolderBtn, &QPushButton::clicked, this, [this](){ 
+        switchToProcessPage(true); 
+        isCompressionMode = true;
+        dropZone->setText("Drag && Drop Folder Here\nor Click to Browse");
+        hintLabel->setText("Supported: All Folder Types (Text-heavy Recommended)");
+        hintLabel->setStyleSheet("color: #00e5ff; font-weight: bold; font-size: 13px;");
+    });
+    
+    connect(decompressFileBtn, &QPushButton::clicked, this, [this](){ 
+        switchToProcessPage(false); 
+        isCompressionMode = false;
+        dropZone->setText("Drag && Drop .hpf File Here\nor Click to Browse");
+        hintLabel->setText("Target: Single Compressed File (.hpf)");
+        hintLabel->setStyleSheet("color: #00e5ff; font-weight: bold; font-size: 13px;");
+    });
+
+    connect(decompressFolderBtn, &QPushButton::clicked, this, [this](){ 
+        switchToProcessPage(true); 
+        isCompressionMode = false;
+        dropZone->setText("Drag && Drop .hpa Archive Here\nor Click to Browse");
+        hintLabel->setText("Target: Compressed Folder Archive (.hpa)");
+        hintLabel->setStyleSheet("color: #00e5ff; font-weight: bold; font-size: 13px;");
+    });
 
     stackedWidget->addWidget(homePage);
 }
@@ -145,7 +239,7 @@ void MainWindow::setupProcessPage() {
     layout->setContentsMargins(30, 30, 30, 30);
 
     // Back Button
-    backButton = new QPushButton("← Back to Home", processPage);
+    backButton = new QPushButton("⬅ Home", processPage);
     backButton->setObjectName("backButton");
     backButton->setCursor(Qt::PointingHandCursor);
     backButton->setFixedWidth(120);
@@ -158,6 +252,12 @@ void MainWindow::setupProcessPage() {
     dropZone->setCursor(Qt::PointingHandCursor);
     dropZone->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     layout->addWidget(dropZone);
+
+    // Hint Label
+    hintLabel = new QLabel("", processPage);
+    hintLabel->setAlignment(Qt::AlignCenter);
+    hintLabel->setStyleSheet("color: #888; font-size: 12px; margin-top: -10px; margin-bottom: 10px;");
+    layout->addWidget(hintLabel);
 
     // File Info Label (Hidden initially)
     fileInfoLabel = new QLabel("", this);
@@ -219,8 +319,10 @@ void MainWindow::switchToProcessPage(bool folderMode) {
 
     if (isFolderMode) {
         dropZone->setText("Drag & Drop FOLDER Here\nor Click to Browse");
+        hintLabel->setText("Supports all folder types (Text-heavy folders recommended)");
     } else {
         dropZone->setText("Drag & Drop FILE Here\nor Click to Browse");
+        hintLabel->setText("Supported Formats: .txt, .md, .cpp, .py, .json, .xml, .html, .css, .log, .csv...");
     }
 
     stackedWidget->setCurrentWidget(processPage);
@@ -353,6 +455,27 @@ void MainWindow::dropEvent(QDropEvent *event) {
                     return;
                 }
 
+                // Validate file type based on current mode
+                QFileInfo fi(fileName);
+                QString suffix = fi.suffix().toLower();
+                
+                // If in compression mode, only accept text files or folders
+                if (isCompressionMode) {
+                    if (!fi.isDir() && !isTextFile(fileName)) {
+                        QMessageBox::warning(this, "Invalid File Type", 
+                            "Only text files are accepted for compression.\n"
+                            "Supported: .txt, .md, .cpp, .py, .json, .xml, .html, .css, .log, .csv, etc.");
+                        return;
+                    }
+                } else {
+                    // In decompression mode, only accept .hpf or .hpa files
+                    if (suffix != "hpf" && suffix != "hpa") {
+                        QMessageBox::warning(this, "Invalid File Type", 
+                            "Only HuffPressor files (.hpf or .hpa) are accepted for decompression.");
+                        return;
+                    }
+                }
+
                 selectedFilePath = fileName;
                 updateSmartUI();
                 log("Selected: " + fileName.toStdString());
@@ -383,8 +506,16 @@ void MainWindow::selectFile() {
     if (isFolderMode) {
         fileName = QFileDialog::getExistingDirectory(this, "Select Folder to Compress");
     } else {
-        fileName = QFileDialog::getOpenFileName(this, "Select File to Compress", "", 
-            "Text Files (*.txt *.md *.cpp *.h *.c *.hpp *.py *.java *.js *.ts *.html *.css *.json *.xml *.log *.csv *.cmake *.yaml *.yml *.ini *.bat *.sh);;All Files (*.*)");
+        // Different filters based on compression vs decompression mode
+        if (isCompressionMode) {
+            // For compression: only allow text files
+            fileName = QFileDialog::getOpenFileName(this, "Select File to Compress", "", 
+                "Text Files (*.txt *.md *.cpp *.h *.c *.hpp *.py *.java *.js *.ts *.html *.css *.json *.xml *.log *.csv *.cmake *.yaml *.yml *.ini *.bat *.sh)");
+        } else {
+            // For decompression: only allow .hpf files
+            fileName = QFileDialog::getOpenFileName(this, "Select Compressed File", "", 
+                "HuffPressor Files (*.hpf)");
+        }
     }
     
     if (!fileName.isEmpty()) {
