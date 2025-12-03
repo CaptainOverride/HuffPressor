@@ -87,6 +87,7 @@ private:
     void updateSmartUI(); // Decides which button to show
     void switchToProcessPage(bool folderMode);
     void goBack();
+    bool isTextFile(const QString& path);
 };
 
 #endif // MAINWINDOW_H

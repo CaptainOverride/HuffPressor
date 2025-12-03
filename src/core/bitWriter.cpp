@@ -42,16 +42,11 @@ void BitWriter::writeBits(const std::string& bits) {
 }
 
 // Writes a raw byte directly (used for writing file size, etc.)
+// Writes a raw byte by writing 8 bits (MSB first)
 void BitWriter::writeByte(unsigned char byte) {
-    // Flush buffer if it's not aligned to a byte boundary
-    if (bitCount != 0) flush();
-
-    out.put(byte);
-
-#if ENABLE_LOGGING
-    std::cout << "Raw Byte Written: " << std::bitset<8>(static_cast<int>(byte))
-              << " (" << static_cast<int>(byte) << ")\n";
-#endif
+    for (int i = 7; i >= 0; --i) {
+        writeBit((byte >> i) & 1);
+    }
 }
 
 // Flushes any bits left in the buffer by padding with 0s and writing the final byte

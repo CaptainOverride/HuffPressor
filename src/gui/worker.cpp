@@ -126,7 +126,11 @@ void Worker::processDecompression(const QString& inputFile, const QString& outpu
             }
         } else {
             // Not an archive, just rename temp to final
-            fs::rename(tempDecompPath, outputFile.toStdString());
+            std::string outPath = outputFile.toStdString();
+            if (fs::exists(outPath)) {
+                fs::remove_all(outPath);
+            }
+            fs::rename(tempDecompPath, outPath);
             emit operationFinished(true, "Decompression successful! Ready to save.");
         }
 

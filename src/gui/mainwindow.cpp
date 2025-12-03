@@ -261,6 +261,12 @@ QString MainWindow::formatSize(uint64_t bytes) {
     return QString::number(size, 'f', 2) + " " + units[i];
 }
 
+bool MainWindow::isTextFile(const QString& path) {
+    QStringList allowed = { "txt", "md", "cpp", "h", "c", "hpp", "py", "java", "js", "ts", "html", "css", "json", "xml", "log", "csv", "cmake", "yaml", "yml", "ini", "bat", "sh" };
+    QString suffix = QFileInfo(path).suffix().toLower();
+    return allowed.contains(suffix);
+}
+
 void MainWindow::updateSmartUI() {
     if (selectedFilePath.isEmpty()) return;
 
@@ -296,6 +302,19 @@ void MainWindow::updateSmartUI() {
             selectedFilePath.clear();
             updateSmartUI(); // Reset
             return;
+        }
+
+        // Enforce Text-Only Restriction for Files
+        if (!isFolderMode && !fi.isDir()) {
+            if (!isTextFile(selectedFilePath)) {
+                 QMessageBox::information(this, "Optimization Notice", 
+                    "HuffPressor is designed for text-based files.\n"
+                    "Binary files (images, videos, etc.) are already compressed and won't benefit from Huffman coding.\n\n"
+                    "Please select a text file (e.g., .txt, .cpp, .py) to see the magic!");
+                 selectedFilePath.clear();
+                 updateSmartUI();
+                 return;
+            }
         }
 
         actionButton->setText("Compress " + (fi.isDir() ? QString("Folder") : QString("File")));
@@ -364,7 +383,8 @@ void MainWindow::selectFile() {
     if (isFolderMode) {
         fileName = QFileDialog::getExistingDirectory(this, "Select Folder to Compress");
     } else {
-        fileName = QFileDialog::getOpenFileName(this, "Select File to Compress");
+        fileName = QFileDialog::getOpenFileName(this, "Select File to Compress", "", 
+            "Text Files (*.txt *.md *.cpp *.h *.c *.hpp *.py *.java *.js *.ts *.html *.css *.json *.xml *.log *.csv *.cmake *.yaml *.yml *.ini *.bat *.sh);;All Files (*.*)");
     }
     
     if (!fileName.isEmpty()) {

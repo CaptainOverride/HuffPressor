@@ -57,8 +57,8 @@ ErrorCode Decompressor::decompressFile(const std::string& inputFilename, const s
 
     if (logger) logger("Huffman Tree deserialized successfully.\n");
 
-    // Step 2: Align to byte boundary
-    reader.alignToByte();
+    // Step 2: Align to byte boundary - REMOVED (Bit stream is now continuous)
+    // reader.alignToByte();
 
     // Step 3: Read original file size
     uint64_t originalSize = 0;
