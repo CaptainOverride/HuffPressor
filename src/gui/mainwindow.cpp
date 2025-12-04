@@ -191,7 +191,7 @@ void MainWindow::setupHomePage() {
     footer->setOpenExternalLinks(true);
     footer->setAlignment(Qt::AlignCenter);
     footer->setText(
-        "<span style='color: #555; font-size: 11px;'>v1.0.0 • C++ & Qt • Created by </span>"
+        "<span style='color: #555; font-size: 11px;'>v1.0.0 • C++ & Qt • Engineered by </span>"
         "<a href='https://github.com/CaptainOverride' style='color: #00e5ff; text-decoration: none; font-weight: bold; font-size: 11px;'>CaptainOverride</a>"
     );
     homeLayout->addWidget(footer);

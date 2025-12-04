@@ -35,10 +35,12 @@ cmake_install.cmake
 # Logs and temporary files
 *.log
 *.tmp
+build_err.log
+build_log.txt
 
-# Project Data files (generated during testing)
+# Test data and generated files
+data/
 *.huff
+*.hpf
+*.hpa
 *.decompressed
-data/*.huff
-data/*.decompressed
-data/decompressed_*.txt
